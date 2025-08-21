@@ -1,0 +1,128 @@
+{% extends "nav.html" %}
+{% block title %}Home • EPICHECK{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Make hero fill the viewport under fixed navbar; no outer spacing */
+  .hero-edge { margin: 0; }
+  .hero-wrap{
+    min-height: calc(100vh - 86px); /* 86px = navbar offset from nav.html */
+    display:flex; align-items:center; position:relative; overflow:hidden;
+    width:100%;
+    background:
+      radial-gradient(1200px 300px at -10% -10%, rgba(99,102,241,.16), transparent 55%),
+      radial-gradient(900px 260px at 110% 110%, rgba(16,185,129,.16), transparent 55%),
+      linear-gradient(135deg,#0f172a 0%, #1e293b 70%);
+    color:#fff;
+  }
+  /* No rounded corners or shadows -> cleaner, flush with edges */
+  .hero-inner { width:100%; }
+  .hero-title{
+    font-weight: 800; line-height: 1.05; letter-spacing: .2px;
+    background: linear-gradient(90deg,#93c5fd,#c4b5fd,#f0abfc);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom:.5rem;
+  }
+  .muted { color:#cbd5e1; }
+
+  /* Minimal cards below hero */
+  .feature-card{
+    border-radius:14px; padding:18px;
+    background: rgba(255,255,255,.72);
+    border:1px solid rgba(255,255,255,.35);
+  }
+  @media (prefers-color-scheme: dark){
+    .feature-card{ background: rgba(23,25,35,.62); border-color: rgba(255,255,255,.08); }
+  }
+
+  /* Buttons: tidy + strong contrast */
+  .btn-cta{
+    border-radius:12px; padding:.85rem 1.15rem; font-weight:700; border:0;
+  }
+  .btn-accent{
+    background: linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6); color:#0b1220;
+  }
+  .btn-soft{
+    background: rgba(59,130,246,.18); color:#e5edff; border:1px solid rgba(59,130,246,.30);
+  }
+  .btn-soft:hover{ background: rgba(59,130,246,.26); color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- HERO: full width & height (no container padding) -->
+<section class="container-fluid px-0 hero-edge">
+  <div class="hero-wrap">
+    <div class="container-lg hero-inner py-5">
+      <div class="row align-items-center g-4">
+        <div class="col-12 col-lg-7">
+          <div class="small mb-2 d-flex align-items-center gap-2">
+            <i class="bi bi-shield-check"></i>
+            <span>EPICHECK • AI for Youth Health Misinformation</span>
+          </div>
+
+          <h1 class="display-5 hero-title">Spot health misinformation.<br>Learn the facts—fast.</h1>
+          <p class="lead muted mb-4">
+            Real-time social content scanning with evidence-based validation and bite-size quizzes.
+          </p>
+
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('monitor') }}" class="btn btn-cta btn-accent">
+              <i class="bi bi-activity me-1"></i> Open Social Monitoring
+            </a>
+            <a href="{{ url_for('quiz_daily') }}" class="btn btn-cta btn-soft">
+              <i class="bi bi-stars me-1"></i> Take Today’s Quiz
+            </a>
+
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <div class="feature-card">
+            <div class="d-flex align-items-center mb-2">
+              <i class="bi bi-lightbulb me-2"></i>
+              <strong>How it works</strong>
+            </div>
+            <ol class="mb-0 small">
+              <li>Search trending claims in <em>Monitor</em> (YouTube & Reddit).</li>
+              <li>We flag <span class="text-success">valid</span> / <span class="text-danger">invalid</span> / <span class="text-warning">uncertain</span> posts with citations.</li>
+              <li>Practice with the <em>Daily Quiz</em> and track your score.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Secondary section (optional; can remove for ultra-minimal landing) -->
+<section class="container my-4">
+  <div class="row g-3">
+    <div class="col-12 col-md-4">
+      <div class="feature-card h-100">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-search me-2"></i><strong>Monitor</strong>
+        </div>
+        <div class="small">Scan social posts, auto-summarize, and validate against WHO/CDC/NIH sources.</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="feature-card h-100">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-check2-square me-2"></i><strong>Daily Quiz</strong>
+        </div>
+        <div class="small">10 quick MCQs with explanations. First-try scoring: +1 correct, +0 wrong.</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="feature-card h-100">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-person-badge me-2"></i><strong>Profile</strong>
+        </div>
+        <div class="small">View your recent scores and search history in a clean dashboard.</div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

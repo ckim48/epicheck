@@ -1,0 +1,651 @@
+{% extends "nav.html" %}
+
+{% block title %}Social Monitoring • EPICHECK{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root{
+    --glass: rgba(255,255,255,.7);
+    --glass-dark: rgba(23,25,35,.65);
+    --blur: blur(12px);
+    --ring: rgba(99,102,241,.35);
+    --surface: #0e1014;
+    --text-weak: #6b7280;
+  }
+  @media (prefers-color-scheme: dark){
+    :root { --glass: rgba(33,37,41,.5); --ring: rgba(99,102,241,.35); }
+    body{ background: #0b0d12; color: #e8eaed; }
+  }
+
+  /* Background */
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at -10% -10%, #c7e1ff 0, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #ffd6ef 0, transparent 60%),
+      radial-gradient(1000px 600px at 50% 120%, #dcffe1 0, transparent 60%), #f7f8fc;
+  }
+  @media (prefers-color-scheme: dark){
+    body {
+      background:
+        radial-gradient(1200px 600px at -10% -10%, #0d1930 0, transparent 60%),
+        radial-gradient(900px 500px at 110% 10%, #2a1025 0, transparent 60%),
+        radial-gradient(1000px 600px at 50% 120%, #0f2a15 0, transparent 60%), var(--surface);
+    }
+  }
+
+  /* Glass card */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    .glass { background: var(--glass-dark); border-color: rgba(255,255,255,.08); }
+  }
+
+  /* Header band */
+  .hero {
+    border-radius: 20px;
+    padding: 28px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg,#111827, #1f2937);
+  }
+  .hero::after{
+    content:""; position:absolute; inset:-2px;
+    background: radial-gradient(650px 150px at 10% -20%, rgba(99,102,241,.35), transparent 40%),
+                radial-gradient(650px 150px at 90% 120%, rgba(16,185,129,.35), transparent 40%);
+    pointer-events:none;
+  }
+
+  /* Sticky action bar */
+  .action-bar { position: sticky; top: 12px; z-index: 20; border-radius: 18px; }
+
+  /* Inputs */
+  .search-xl { height: 56px; font-size: 1.05rem; border-radius: 14px; }
+  .segmented {
+    display:inline-flex; gap:6px; padding:6px; border-radius:999px;
+    background: rgba(0,0,0,.06);
+  }
+  .segmented .seg { border-radius:999px; padding:8px 14px; border:0; font-weight:600; }
+  .segmented .seg.active { background:#111827; color:#fff; }
+  @media (prefers-color-scheme: dark){
+    .segmented { background: rgba(255,255,255,.08); }
+    .segmented .seg { color:#e8eaed; background: transparent; border:1px solid rgba(255,255,255,.14); }
+    .segmented .seg.active { background:#e8eaed; color:#111827; border-color:transparent; }
+  }
+
+  /* Post card */
+  .post-card {
+    transition: transform .16s ease, box-shadow .16s ease, border-color .2s ease;
+    border: 1px solid rgba(255,255,255,.35);
+  }
+  .post-card:hover { transform: translateY(-2px); box-shadow: 0 18px 40px rgba(0,0,0,.10); }
+  .tiny{font-size:.9rem}
+  .post-body{white-space:pre-wrap}
+  .chip {
+    display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem;
+    background: rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark){ .chip { background: rgba(255,255,255,.08); } }
+
+  /* Section headers */
+  .section-tag { border-top-left-radius:18px; border-top-right-radius:18px; padding: 14px 16px; font-weight:700; }
+
+  /* Verdict colors */
+  .valid-bg { background: rgba(16,185,129,.18); }
+  .uncertain-bg { background: rgba(245,158,11,.18); }
+  .invalid-bg { background: rgba(239,68,68,.18); }
+
+  /* Confidence bar */
+  .conf { --w: 0%; height: 8px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,.08); }
+  .conf > i { display:block; height: 100%; width: var(--w); background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981); }
+  @media (prefers-color-scheme: dark){ .conf { background: rgba(255,255,255,.12); } }
+
+  /* Loading overlay */
+  #loadingOverlay {
+    position: fixed; inset: 0; background: rgba(15,18,23,.6);
+    display: none; align-items: center; justify-content: center; z-index: 9999;
+    backdrop-filter: blur(4px);
+  }
+  .spinner {
+    width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35);
+    border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite;
+    box-shadow: 0 0 0 6px var(--ring);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Platform badges */
+  .yt-badge { background: #ff0000 !important; }
+  .rd-badge { background: #ff4500 !important; }
+  .action-bar {
+  position: relative;
+}
+  /* ==== Modern Modal – Glass + Gradient + Blur Backdrop ==== */
+.modal-backdrop.show { backdrop-filter: blur(6px); background: rgba(10,12,18,.45); }
+
+.modal-content.glass {
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, rgba(255,255,255,.70), rgba(255,255,255,.55));
+  box-shadow: 0 30px 80px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark){
+  .modal-content.glass{
+    background: linear-gradient(180deg, rgba(30,34,44,.80), rgba(20,23,30,.70));
+    border-color: rgba(255,255,255,.08);
+  }
+}
+
+/* Hero band inside modal */
+.modal-hero {
+  position: relative;
+  padding: 28px 28px 22px;
+  color: #fff;
+  background: linear-gradient(135deg,#111827 0%, #1f2937 50%, #0b5 120%);
+  overflow: hidden;
+}
+.modal-hero::after{
+  content:"";
+  position:absolute; inset:-30%;
+  background:
+    radial-gradient(500px 160px at 10% -10%, rgba(99,102,241,.45), transparent 55%),
+    radial-gradient(500px 160px at 90% 120%, rgba(16,185,129,.45), transparent 55%);
+  pointer-events:none;
+}
+.modal-hero h5 { margin: 0; font-weight: 800; letter-spacing: .2px; }
+.modal-hero p  { margin: 6px 0 0; opacity: .9; }
+
+/* Icon chip */
+.icon-chip {
+  display:inline-flex; align-items:center; justify-content:center;
+  width: 42px; height: 42px; border-radius: 12px;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.35);
+  margin-right: 10px;
+}
+
+/* Body content */
+.modal-body.modern { padding: 20px 22px 6px; }
+.step-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+@media (max-width: 768px){ .step-grid{ grid-template-columns: 1fr; } }
+
+.step {
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 14px;
+  padding: 12px 12px 12px 14px;
+  background: rgba(255,255,255,.6);
+  display: flex; gap: 10px; align-items: start;
+  transition: transform .15s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.step:hover{ transform: translateY(-1px); box-shadow: 0 12px 24px rgba(0,0,0,.07); }
+@media (prefers-color-scheme: dark){
+  .step{
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.10);
+  }
+}
+
+.step i { font-size: 1.1rem; margin-top: 1px; }
+.step h6 { margin: 0; font-weight: 700; font-size: .98rem; }
+.step p  { margin: 4px 0 0; opacity: .8; font-size: .92rem; }
+
+/* Shortcut + tips row */
+.tips {
+  margin-top: 10px;
+  display: grid; gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 768px){ .tips{ grid-template-columns: 1fr; } }
+
+.card-min {
+  border-radius: 14px;
+  border: 1px dashed rgba(0,0,0,.10);
+  background: rgba(0,0,0,.03);
+  padding: 12px 14px;
+}
+@media (prefers-color-scheme: dark){
+  .card-min{
+    border-color: rgba(255,255,255,.14);
+    background: rgba(255,255,255,.05);
+  }
+}
+
+.kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .85rem;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.18);
+  background: rgba(255,255,255,.8);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.08);
+  margin-right: 6px;
+}
+@media (prefers-color-scheme: dark){
+  .kbd{ background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.18); }
+}
+
+/* Footer CTA */
+.modal-footer.modern {
+  border-top: 1px solid rgba(0,0,0,.06);
+  padding: 14px 18px 18px;
+}
+@media (prefers-color-scheme: dark){
+  .modal-footer.modern{ border-color: rgba(255,255,255,.08); }
+}
+.btn-gradient {
+  border: 0; color: #fff; font-weight: 700;
+  background: #787878;
+  box-shadow: 0 8px 24px rgba(16,185,129,.25);
+}
+.btn-gradient:hover{ filter: brightness(.98); }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+  <!-- Sticky action bar -->
+  <section class="container my-3">
+    <div class="glass action-bar p-3 p-md-4">
+      <button type="button"
+              class="btn btn-light rounded-circle shadow-sm position-absolute bottom-0 end-0 m-3"
+              data-bs-toggle="modal"
+              data-bs-target="#instructionModal"
+              aria-label="Instructions">
+        <i class="bi bi-question-lg"></i>
+      </button>
+
+      <form id="searchForm" method="post" class="row g-3 align-items-center">
+        <div class="col-12 col-lg-6">
+          <div class="input-group">
+            <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search"></i></span>
+            <input name="keywords" class="form-control search-xl border-start-0" placeholder="Type keywords — e.g. detox, garlic, weight loss" value="{{ keywords }}">
+          </div>
+        </div>
+
+        <!-- Source filters -->
+        <div class="col-12 col-lg-4 d-flex gap-2 justify-content-lg-center">
+          {% set sels = selected_sources or [] %}
+          <div class="segmented">
+            <input type="checkbox" id="src_yt" class="d-none" name="sources" value="youtube" {% if 'youtube' in sels or not sels %}checked{% endif %}>
+            <label class="seg {% if 'youtube' in sels or not sels %}active{% endif %}" for="src_yt"><i class="bi bi-youtube me-1"></i>YouTube</label>
+
+            <input type="checkbox" id="src_rd" class="d-none" name="sources" value="reddit" {% if 'reddit' in sels or not sels %}checked{% endif %}>
+            <label class="seg {% if 'reddit' in sels or not sels %}active{% endif %}" for="src_rd"><i class="bi bi-reddit me-1"></i>Reddit</label>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-2 d-grid">
+          <button id="searchBtn" class="btn btn-dark btn-lg">
+            <i class="bi bi-rocket-takeoff me-1"></i> Search
+          </button>
+        </div>
+
+        <!-- Verdict quick filter (client-side) -->
+        <div class="col-12">
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="text-muted tiny">Filter:</span>
+            <div class="segmented" id="verdictSeg">
+              <button type="button" class="seg active" data-v="all"><i class="bi bi-grid-1x2 me-1"></i>All</button>
+              <button type="button" class="seg" data-v="valid"><i class="bi bi-check-circle me-1"></i>Valid</button>
+              <button type="button" class="seg" data-v="uncertain"><i class="bi bi-question-circle me-1"></i>Uncertain</button>
+              <button type="button" class="seg" data-v="invalid"><i class="bi bi-x-circle me-1"></i>Invalid</button>
+            </div>
+
+            {% if sources_used %}
+              <div class="ms-auto tiny text-muted">
+                <i class="bi bi-clock-history me-1"></i> {{ ", ".join(sources_used) }} • {{ now }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <main class="container my-3 mt-4">
+    <div class="row g-3" id="resultGrid">
+      <!-- VALID -->
+      <div class="col-12 col-lg-4 verdict-col" data-v="valid">
+        <div class="glass h-100">
+          <div class="section-tag valid-bg">
+            <span class="text-success"><i class="bi bi-check2-circle me-1"></i>Valid</span>
+          </div>
+          <div class="p-3">
+            {% if results.valid %}
+              {% for p in results.valid %}
+              {% set pct = ((p.credibility_score or 0) * 100) | round(0, 'floor') %}
+              <article class="post-card glass p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="valid">
+                <div class="d-flex justify-content-between tiny mb-1">
+                  <span>
+                    {% if p.platform == 'YouTube' %}
+                      <span class="badge yt-badge">YouTube</span>
+                    {% elif p.platform == 'Reddit' %}
+                      <span class="badge rd-badge">Reddit</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">{{ p.platform }}</span>
+                    {% endif %}
+                    <strong class="ms-2">{{ p.author }}</strong>
+                  </span>
+                  <span class="text-muted">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+                </div>
+
+                <div class="post-body my-2">{{ p.text }}</div>
+
+                {% if p.transcript_excerpt %}
+                  <div class="tiny mb-2">
+                    <span class="chip"><i class="bi bi-chat-left-text me-1"></i>Transcript</span>
+                    <div class="text-muted mt-1">{{ p.transcript_excerpt }}</div>
+                  </div>
+                {% endif %}
+
+                <div class="tiny mb-2">
+                  <div class="d-flex justify-content-between">
+                    <span class="text-success">Verdict: Valid</span>
+                    <span>{{ pct|int }}%</span>
+                  </div>
+                  <div class="conf"><i style="--w: {{ pct|int }}%"></i></div>
+                </div>
+
+                <div class="tiny text-muted">{{ p.explanation }}</div>
+                <div class="tiny mt-2">
+                  {% for c in p.citations %}
+                    <div>• <a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.title }}</a></div>
+                  {% endfor %}
+                </div>
+                {% if p.url %}
+                  <a class="tiny d-inline-block mt-2" href="{{ p.url }}" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>View Post
+                  </a>
+                {% endif %}
+              </article>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted mb-0">No valid posts for this query.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- UNCERTAIN -->
+      <div class="col-12 col-lg-4 verdict-col" data-v="uncertain">
+        <div class="glass h-100">
+          <div class="section-tag uncertain-bg">
+            <span class="text-warning"><i class="bi bi-question-circle me-1"></i>Uncertain</span>
+          </div>
+          <div class="p-3">
+            {% if results.uncertain %}
+              {% for p in results.uncertain %}
+              {% set pct = ((p.credibility_score or 0) * 100) | round(0, 'floor') %}
+              <article class="post-card glass p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="uncertain">
+                <div class="d-flex justify-content-between tiny mb-1">
+                  <span>
+                    {% if p.platform == 'YouTube' %}
+                      <span class="badge yt-badge">YouTube</span>
+                    {% elif p.platform == 'Reddit' %}
+                      <span class="badge rd-badge">Reddit</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">{{ p.platform }}</span>
+                    {% endif %}
+                    <strong class="ms-2">{{ p.author }}</strong>
+                  </span>
+                  <span class="text-muted">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+                </div>
+
+                <div class="post-body my-2">{{ p.text }}</div>
+
+                {% if p.transcript_excerpt %}
+                  <div class="tiny mb-2">
+                    <span class="chip"><i class="bi bi-chat-left-text me-1"></i>Transcript</span>
+                    <div class="text-muted mt-1">{{ p.transcript_excerpt }}</div>
+                  </div>
+                {% endif %}
+
+                <div class="tiny mb-2">
+                  <div class="d-flex justify-content-between">
+                    <span>Verdict: Uncertain</span>
+                    <span>{{ pct|int }}%</span>
+                  </div>
+                  <div class="conf"><i style="--w: {{ pct|int }}%"></i></div>
+                </div>
+
+                <div class="tiny text-muted">{{ p.explanation }}</div>
+                <div class="tiny mt-2">
+                  {% for c in p.citations %}
+                    <div>• <a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.title }}</a></div>
+                  {% endfor %}
+                </div>
+                {% if p.url %}
+                  <a class="tiny d-inline-block mt-2" href="{{ p.url }}" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>View Post
+                  </a>
+                {% endif %}
+              </article>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted mb-0">No uncertain posts for this query.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- INVALID -->
+      <div class="col-12 col-lg-4 verdict-col" data-v="invalid">
+        <div class="glass h-100">
+          <div class="section-tag invalid-bg">
+            <span class="text-danger"><i class="bi bi-x-circle me-1"></i>Fake / Invalid</span>
+          </div>
+          <div class="p-3">
+            {% if results.invalid %}
+              {% for p in results.invalid %}
+              {% set pct = ((p.credibility_score or 0) * 100) | round(0, 'floor') %}
+              <article class="post-card glass p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="invalid">
+                <div class="d-flex justify-content-between tiny mb-1">
+                  <span>
+                    {% if p.platform == 'YouTube' %}
+                      <span class="badge yt-badge">YouTube</span>
+                    {% elif p.platform == 'Reddit' %}
+                      <span class="badge rd-badge">Reddit</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">{{ p.platform }}</span>
+                    {% endif %}
+                    <strong class="ms-2">{{ p.author }}</strong>
+                  </span>
+                  <span class="text-muted">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '' }}</span>
+                </div>
+
+                <div class="post-body my-2">{{ p.text }}</div>
+
+                {% if p.transcript_excerpt %}
+                  <div class="tiny mb-2">
+                    <span class="chip"><i class="bi bi-chat-left-text me-1"></i>Transcript</span>
+                    <div class="text-muted mt-1">{{ p.transcript_excerpt }}</div>
+                  </div>
+                {% endif %}
+
+                <div class="tiny mb-2">
+                  <div class="d-flex justify-content-between">
+                    <span class="text-danger">Verdict: Invalid</span>
+                    <span>{{ pct|int }}%</span>
+                  </div>
+                  <div class="conf"><i style="--w: {{ pct|int }}%"></i></div>
+                </div>
+
+                <div class="tiny text-muted">{{ p.explanation }}</div>
+                <div class="tiny mt-2">
+                  {% for c in p.citations %}
+                    <div>• <a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.title }}</a></div>
+                  {% endfor %}
+                </div>
+                {% if p.url %}
+                  <a class="tiny d-inline-block mt-2" href="{{ p.url }}" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>View Post
+                  </a>
+                {% endif %}
+              </article>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted mb-0">No fake/invalid posts for this query.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+<!-- Instruction Modal -->
+<div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content glass">
+
+      <!-- HERO -->
+      <div class="modal-hero">
+        <div class="d-flex align-items-center">
+          <span class="icon-chip"><i class="bi bi-magic"></i></span>
+          <div>
+            <h5 id="instructionModalLabel">EPICHECK — Verify Health Claims Faster</h5>
+            <p class="mb-0">Search YouTube & Reddit, classify posts, and see credibility at a glance.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- BODY -->
+      <div class="modal-body modern">
+        <div class="step-grid">
+          <div class="step">
+            <i class="bi bi-type"></i>
+            <div>
+              <h6>1) Enter Keywords</h6>
+              <p>Try specific phrases like <em>“garlic for weight loss”</em> or <em>“detox tea”</em>.</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <i class="bi bi-funnel"></i>
+            <div>
+              <h6>2) Choose Sources</h6>
+              <p>Toggle YouTube/Reddit; the UI remembers your last choice.</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <i class="bi bi-rocket-takeoff"></i>
+            <div>
+              <h6>3) Run Search</h6>
+              <p>EPICHECK pulls posts, transcripts, and citations into clean cards.</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <i class="bi bi-filter-circle"></i>
+            <div>
+              <h6>4) Filter by Verdict</h6>
+              <p>Switch between <strong>Valid</strong>, <strong>Uncertain</strong>, or <strong>Invalid</strong> instantly.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tips">
+          <div class="card-min">
+            <div class="fw-bold mb-2"><i class="bi bi-lightning-charge me-1"></i> Power Tips</div>
+            <ul class="mb-0 small ps-3">
+              <li>Click a card’s citations to open sources in a new tab.</li>
+              <li>Confidence bar reflects the credibility score; hover cards for emphasis.</li>
+              <li>Toggling sources with keywords auto-runs a fresh search.</li>
+            </ul>
+          </div>
+
+          <div class="card-min">
+            <div class="fw-bold mb-2"><i class="bi bi-keyboard me-1"></i> Shortcuts</div>
+            <div class="small">
+              <span class="kbd">/</span> Focus search
+              <span class="ms-3 kbd">1</span> Valid
+              <span class="ms-1 kbd">2</span> Uncertain
+              <span class="ms-1 kbd">3</span> Invalid
+            </div>
+            <div class="text-muted small mt-2">Shortcuts are active while this page is focused.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="modal-footer modern d-flex justify-content-between">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-gradient" data-bs-dismiss="modal" id="startSearch">
+            Start searching
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Loading overlay
+  const form = document.getElementById('searchForm');
+  const btn  = document.getElementById('searchBtn');
+  const overlay = document.getElementById('loadingOverlay');
+  if (form) {
+    form.addEventListener('submit', () => {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Searching...';
+      }
+      overlay.style.display = 'flex';
+    });
+  }
+
+  // Toggle segmented "active" styles for source pills
+  for (const lab of document.querySelectorAll('.segmented label')) {
+    lab.addEventListener('click', () => {
+      const input = document.getElementById(lab.getAttribute('for'));
+      setTimeout(() => lab.classList.toggle('active', input.checked), 0);
+    });
+  }
+
+  // Client-side verdict filter (no re-fetch)
+  const verdictSeg = document.getElementById('verdictSeg');
+  if (verdictSeg) {
+    verdictSeg.addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg');
+      if (!btn) return;
+      verdictSeg.querySelectorAll('.seg').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const v = btn.dataset.v; // all | valid | uncertain | invalid
+      document.querySelectorAll('.verdict-col').forEach(col => {
+        if (v === 'all') { col.style.display = ''; }
+        else { col.style.display = (col.dataset.v === v) ? '' : 'none'; }
+      });
+    });
+  }
+
+  // Auto-submit when toggling sources (if there are keywords)
+  document.querySelectorAll('input[name="sources"]').forEach(chk => {
+    chk.addEventListener('change', () => {
+      const kw = document.querySelector('input[name="keywords"]').value.trim();
+      if (kw) document.getElementById('searchForm').requestSubmit();
+    });
+  });
+</script>
+{% endblock %}
