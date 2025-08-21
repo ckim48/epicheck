@@ -811,26 +811,15 @@ def _fmt_dt(val):
     except Exception:
         return str(val)
 
+# ---------- Profile / Dashboard ----------
 @app.route("/profile")
+@login_required
 def profile():
     db = get_db()
+    user_id = g.user["id"]
 
-    # Attempts & stats: per-user if logged in, else per anon session
-    where_col = "user_id"
-    where_val = None
-    is_guest = True
-
-    if g.user:
-        where_val = g.user["id"]
-        is_guest = False
-    else:
-        anon_id = ensure_anon_id()
-        where_col = "anon_id"
-        where_val = anon_id
-
-    # Recent quiz attempts (10)
     attempts = db.execute(
-        f"""
+        """
         SELECT
           qa.id            AS attempt_id,
           qa.quiz_id,
@@ -839,73 +828,53 @@ def profile():
           qa.finished_at,
           q.topic,
           q.is_daily,
-          (SELECT COUNT(*) FROM quiz_items WHERE quiz_id = qa.quiz_id)      AS total_items,
-          (SELECT COUNT(*) FROM quiz_answers WHERE attempt_id = qa.id)      AS answered
+          (SELECT COUNT(*) FROM quiz_items WHERE quiz_id = qa.quiz_id) AS total_items,
+          (SELECT COUNT(*) FROM quiz_answers WHERE attempt_id = qa.id) AS answered
         FROM quiz_attempts qa
         JOIN quizzes q ON q.id = qa.quiz_id
-        WHERE qa.{where_col} = ?
+        WHERE qa.user_id = ?
         ORDER BY qa.started_at DESC
         LIMIT 10
         """,
-        (where_val,)
+        (user_id,)
     ).fetchall()
 
-    # Aggregate stats
     stats = db.execute(
-        f"""
+        """
         SELECT
-          COUNT(*)                         AS total_quizzes,
-          COALESCE(AVG(score), 0)         AS avg_score,
-          COALESCE(MAX(score), 0)         AS best_score,
-          MAX(started_at)                 AS last_active
+          COUNT(*)                 AS total_quizzes,
+          COALESCE(AVG(score), 0)  AS avg_score,
+          COALESCE(MAX(score), 0)  AS best_score,
+          MAX(started_at)          AS last_active
         FROM quiz_attempts
-        WHERE {where_col} = ?
+        WHERE user_id = ?
         """,
-        (where_val,)
+        (user_id,)
     ).fetchone() or {"total_quizzes": 0, "avg_score": 0, "best_score": 0, "last_active": None}
 
-    # Recent searches (10)
-    # - For logged-in users: only their searches
-    # - For guests: show latest guest (user_id IS NULL) searches
-    if is_guest:
-        searches = db.execute(
-            """
-            SELECT s.id, s.keywords, s.sources, s.created_at,
-                   SUM(CASE WHEN p.verdict='valid' THEN 1 ELSE 0 END)     AS valid_count,
-                   SUM(CASE WHEN p.verdict='invalid' THEN 1 ELSE 0 END)   AS invalid_count,
-                   SUM(CASE WHEN p.verdict='uncertain' THEN 1 ELSE 0 END) AS uncertain_count
-            FROM searches s
-            LEFT JOIN posts p ON p.search_id = s.id
-            WHERE s.user_id IS NULL
-            GROUP BY s.id
-            ORDER BY s.id DESC
-            LIMIT 10
-            """
-        ).fetchall()
-    else:
-        searches = db.execute(
-            """
-            SELECT s.id, s.keywords, s.sources, s.created_at,
-                   SUM(CASE WHEN p.verdict='valid' THEN 1 ELSE 0 END)     AS valid_count,
-                   SUM(CASE WHEN p.verdict='invalid' THEN 1 ELSE 0 END)   AS invalid_count,
-                   SUM(CASE WHEN p.verdict='uncertain' THEN 1 ELSE 0 END) AS uncertain_count
-            FROM searches s
-            LEFT JOIN posts p ON p.search_id = s.id
-            WHERE s.user_id = ?
-            GROUP BY s.id
-            ORDER BY s.id DESC
-            LIMIT 10
-            """,
-            (g.user["id"],)
-        ).fetchall()
+    searches = db.execute(
+        """
+        SELECT s.id, s.keywords, s.sources, s.created_at,
+               SUM(CASE WHEN p.verdict='valid' THEN 1 ELSE 0 END)     AS valid_count,
+               SUM(CASE WHEN p.verdict='invalid' THEN 1 ELSE 0 END)   AS invalid_count,
+               SUM(CASE WHEN p.verdict='uncertain' THEN 1 ELSE 0 END) AS uncertain_count
+        FROM searches s
+        LEFT JOIN posts p ON p.search_id = s.id
+        WHERE s.user_id = ?
+        GROUP BY s.id
+        ORDER BY s.id DESC
+        LIMIT 10
+        """,
+        (user_id,)
+    ).fetchall()
 
     return render_template(
         "profile.html",
-        is_guest=is_guest,
+        is_guest=False,
         user=g.user,
         stats=dict(stats),
-        attempts=_rows_to_dicts(attempts),
-        searches=_rows_to_dicts(searches),
+        attempts=[dict(r) for r in attempts],
+        searches=[dict(r) for r in searches],
     )
 
 def ai_validate(text_for_ai):
@@ -1016,9 +985,8 @@ def login():
 def logout():
     session.pop("user_id", None)
     return redirect(url_for("index"))
-
-# ---------- Monitor ----------
 @app.route("/monitor", methods=["GET", "POST"])
+@login_required
 def monitor():
     keywords = request.values.get("keywords", "").strip()
     selected_sources = request.values.getlist("sources") or ["youtube", "reddit"]
@@ -1028,43 +996,10 @@ def monitor():
 
     if request.method == "POST" and keywords:
         posts = []
+        # ... (unchanged fetch + validate code) ...
 
-        if "youtube" in selected_sources:
-            yt = fetch_youtube_search(keywords, limit=8)
-            if yt:
-                sources_used.append("youtube")
-                posts += yt
-
-        if "reddit" in selected_sources:
-            rd = fetch_reddit_search(keywords, limit=8)
-            if rd:
-                sources_used.append("reddit")
-                posts += rd
-
-        for p in posts:
-            text_for_ai = p["text"]
-            if p.get("platform") == "YouTube" and p.get("video_id"):
-                tx = get_youtube_transcript(p["video_id"])
-                if tx:
-                    p["transcript_excerpt"] = tx[:400]
-                    text_for_ai = f"{p['text']}\n\n[Transcript excerpt]\n{tx}"
-
-            verdict = ai_validate(text_for_ai)
-            label = verdict.get("verdict", "uncertain")
-            item = {
-                **p,
-                "verdict": label,
-                "credibility_score": verdict.get("credibility_score"),
-                "explanation": verdict.get("explanation"),
-                "citations": verdict.get("citations", []),
-            }
-            results[label if label in results else "uncertain"].append(item)
-
-        for k in results:
-            results[k].sort(key=lambda x: to_aware_utc(x.get("created_at")), reverse=True)
-
-        # Persist (attach user_id if logged in)
-        user_id = g.user["id"] if g.user else None
+        # Persist (attach user_id – guaranteed present due to @login_required)
+        user_id = g.user["id"]
         search_id = save_monitor_search(keywords, sources_used or selected_sources, user_id)
         save_monitor_posts(search_id, results)
 
@@ -1081,6 +1016,7 @@ def monitor():
         selected_sources=selected_sources
     )
 @app.route("/quiz", methods=["GET", "POST"])
+@login_required
 def quiz():
     items = []
     points = 0
