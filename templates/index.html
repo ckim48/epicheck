@@ -3,126 +3,797 @@
 
 {% block extra_head %}
 <style>
-  /* Make hero fill the viewport under fixed navbar; no outer spacing */
-  .hero-edge { margin: 0; }
-  .hero-wrap{
-    min-height: calc(100vh - 86px); /* 86px = navbar offset from nav.html */
-    display:flex; align-items:center; position:relative; overflow:hidden;
-    width:100%;
-    background:
-      radial-gradient(1200px 300px at -10% -10%, rgba(99,102,241,.16), transparent 55%),
-      radial-gradient(900px 260px at 110% 110%, rgba(16,185,129,.16), transparent 55%),
-      linear-gradient(135deg,#0f172a 0%, #1e293b 70%);
-    color:#fff;
-  }
-  /* No rounded corners or shadows -> cleaner, flush with edges */
-  .hero-inner { width:100%; }
-  .hero-title{
-    font-weight: 800; line-height: 1.05; letter-spacing: .2px;
-    background: linear-gradient(90deg,#93c5fd,#c4b5fd,#f0abfc);
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom:.5rem;
-  }
-  .muted { color:#cbd5e1; }
+/* ---------- Base / Theme ---------- */
+:root{
+  --glass: rgba(255,255,255,.72);
+  --glass-dark: rgba(23,25,35,.62);
+  --glass-border: rgba(255,255,255,.12);
+  --ring: rgba(99,102,241,.35);
+  --ink: #0b1220;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --glass: rgba(23,25,35,.62); --glass-border: rgba(255,255,255,.08); }
+}
 
-  /* Minimal cards below hero */
-  .feature-card{
-    border-radius:14px; padding:18px;
-    background: rgba(255,255,255,.72);
-    border:1px solid rgba(255,255,255,.35);
-  }
-  @media (prefers-color-scheme: dark){
-    .feature-card{ background: rgba(23,25,35,.62); border-color: rgba(255,255,255,.08); }
-  }
+.hero-edge { margin: 0; }
 
-  /* Buttons: tidy + strong contrast */
-  .btn-cta{
-    border-radius:12px; padding:.85rem 1.15rem; font-weight:700; border:0;
+/* Base neutral hero */
+.hero-wrap--plain{
+  min-height: 100vh;
+  display:flex; align-items:center; justify-content:center;
+  background: #fff;
+  color: #111;
+  border-bottom: 1px solid #e5e7eb;
+  position: relative;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark){
+  .hero-wrap--plain{
+    background: #0b0f19;
+    color: #e5e7eb;
+    border-bottom-color: #1f2937;
   }
-  .btn-accent{
-    background: linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6); color:#0b1220;
+}
+
+/* Clean typography + neutral buttons */
+.hero-title--plain{ font-weight: 800; line-height: 1.1; letter-spacing: .2px; }
+.btn-cta{ border-radius: 10px; padding: .9rem 1.2rem; font-weight: 700; border: 0; }
+.btn-plain{ background:#111; color:#fff; border:1px solid #111; }
+.btn-plain:hover{ background:#000; border-color:#000; color:#fff; }
+.btn-outline-plain{ background:transparent; color:#111; border:1px solid #d1d5db; }
+.btn-outline-plain:hover{ background:#f8f9fb; border-color:#cbd5e1; color:#111; }
+@media (prefers-color-scheme: dark){
+  .btn-plain{ background:#e5e7eb; color:#0b0f19; border-color:#e5e7eb; }
+  .btn-plain:hover{ background:#fff; border-color:#fff; color:#0b0f19; }
+  .btn-outline-plain{ color:#e5e7eb; border-color:#374151; }
+  .btn-outline-plain:hover{ background:#111827; border-color:#4b5563; color:#e5e7eb; }
+}
+
+/* ---------- Hero background particles ---------- */
+.hero-bg-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+.hero-bg-particles span {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  opacity: 0.8;
+  filter: blur(4px);
+  animation: float-particle linear infinite;
+}
+.hero-bg-particles span:nth-child(1) {
+  width: 120px; height: 120px; background: rgba(96,165,250,0.3);
+  top: 10%; left: 15%; animation-duration: 18s;
+}
+.hero-bg-particles span:nth-child(2) {
+  width: 180px; height: 180px; background: rgba(244,114,182,0.25);
+  top: 40%; left: 70%; animation-duration: 24s; animation-delay: -6s;
+}
+.hero-bg-particles span:nth-child(3) {
+  width: 90px; height: 90px; background: rgba(167,139,250,0.3);
+  top: 70%; left: 20%; animation-duration: 20s; animation-delay: -3s;
+}
+.hero-bg-particles span:nth-child(4) {
+  width: 150px; height: 150px; background: rgba(59,130,246,0.2);
+  top: 25%; left: 50%; animation-duration: 28s; animation-delay: -10s;
+}
+.hero-bg-particles span:nth-child(5) {
+  width: 100px; height: 100px; background: rgba(250,204,21,0.2);
+  top: 80%; left: 80%; animation-duration: 22s; animation-delay: -5s;
+}
+@keyframes float-particle {
+  0%   { transform: translateY(0) translateX(0) scale(1); }
+  50%  { transform: translateY(-50px) translateX(30px) scale(1.1); }
+  100% { transform: translateY(0) translateX(0) scale(1); }
+}
+
+/* ---------- Section shells ---------- */
+.section-pad{ padding: 72px 0; }
+.section-head{ margin-bottom: 22px; }
+.eyebrow{
+  font-size:.85rem; letter-spacing:.12em; text-transform:uppercase; opacity:.85;
+}
+
+/* ---------- Feature grid & cards ---------- */
+.feature-card{
+  border-radius:16px; padding:20px; backdrop-filter: blur(10px);
+  background: var(--glass); border:1px solid var(--glass-border); transition: transform .25s ease;
+}
+.feature-card:hover{ transform: translateY(-2px); }
+
+.btn-accent{ background: linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6); color:var(--ink); }
+.btn-soft{ background: rgba(59,130,246,.18); color:#e5edff; border:1px solid rgba(59,130,246,.30); }
+.btn-soft:hover{ background: rgba(59,130,246,.26); color:#fff; }
+
+.ficon{
+  width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:12px; background: rgba(99,102,241,.16); border:1px solid var(--ring);
+}
+.checkline { display:flex; gap:.6rem; align-items:flex-start; }
+.checkline i{ margin-top:.1rem; }
+
+/* ---------- Contact ---------- */
+.contact-wrap{
+  border-radius:18px; padding:28px; backdrop-filter: blur(10px);
+  background: var(--glass); border:1px solid var(--glass-border);
+}
+.form-control, .form-select{
+  background: rgba(255,255,255,.85);
+}
+@media (prefers-color-scheme: dark){
+  .form-control, .form-select{
+    background: rgba(20,22,30,.75); color:#e5e7eb; border-color: rgba(255,255,255,.12);
   }
-  .btn-soft{
-    background: rgba(59,130,246,.18); color:#e5edff; border:1px solid rgba(59,130,246,.30);
+}
+
+/* ---------- Footer ---------- */
+.mini-footer{
+  color:#93a2b8; font-size:.9rem; border-top:1px dashed rgba(148,163,184,.35);
+}
+
+/* ---------- ABOUT (Enhanced Modern) ---------- */
+.about-enhanced {
+  position: relative;
+  padding: 100px 0;
+  background: #fff;
+  color: #0f172a;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark){
+  .about-enhanced { background:#0b0f19; color:#e5e7eb; }
+}
+/* decorative background shapes */
+.about-enhanced::before,
+.about-enhanced::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: 0.12;
+}
+.about-enhanced::before {
+  top: -100px; left: -120px;
+  width: 300px; height: 300px;
+  background: #60a5fa;
+}
+.about-enhanced::after {
+  bottom: -150px; right: -150px;
+  width: 280px; height: 280px;
+  background: #a78bfa;
+}
+.about-enhanced .head {
+  text-align:center;
+  max-width: 700px;
+  margin: 0 auto 60px auto;
+}
+.about-enhanced .kicker {
+  color: #64748b;
+  margin: 0 auto;
+  max-width: 60ch;
+}
+@media (prefers-color-scheme: dark){
+  .about-enhanced .kicker { color: #94a3b8; }
+}
+.about-enhanced .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(260px,1fr));
+  gap: 28px;
+  position: relative;
+  z-index: 1;
+}
+.about-enhanced .item {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px;
+  transition: transform .25s ease, box-shadow .25s ease;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.about-enhanced .item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.06);
+}
+@media (prefers-color-scheme: dark){
+  .about-enhanced .item { background:#1e293b; border-color:#334155; }
+}
+.about-enhanced .icon {
+  width: 50px; height: 50px;
+  border-radius: 12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 1.4rem;
+  color: #fff;
+  margin-bottom: 14px;
+  background: #334155;
+}
+@media (prefers-color-scheme: dark){
+  .about-enhanced .icon { background:#475569; }
+}
+.about-enhanced h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.about-enhanced p {
+  font-size: .95rem;
+  color: #64748b;
+}
+@media (prefers-color-scheme: dark){
+  .about-enhanced p { color: #cbd5e1; }
+}
+/* ===================== FEATURES (Rail) ===================== */
+.features-rail{
+  padding: 96px 0;
+  background:#fff;
+  color:#0f172a;
+  position: relative;
+}
+@media (prefers-color-scheme: dark){
+  .features-rail{ background:#0b0f19; color:#e5e7eb; }
+}
+
+.features-rail .head{
+  text-align:center;
+  max-width:780px;
+  margin:0 auto 48px;
+}
+.features-rail .eyebrow{
+  font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; color:#94a3b8;
+}
+@media (prefers-color-scheme: dark){ .features-rail .eyebrow{ color:#64748b; } }
+.features-rail h2{
+  font-weight:800; line-height:1.15; margin:10px 0 12px;
+}
+.features-rail .kicker{
+  color:#64748b; max-width:62ch; margin:0 auto;
+}
+@media (prefers-color-scheme: dark){ .features-rail .kicker{ color:#94a3b8; } }
+
+/* rail + rows */
+.rail-wrap{
+  position:relative;
+  max-width:1040px;
+  margin:0 auto;
+  padding-left:32px; /* space for rail on desktop */
+}
+.rail-wrap::before{
+  content:"";
+  position:absolute; top:0; bottom:0; left:12px;
+  width:2px;
+  background: linear-gradient(180deg, #e5e7eb, #e5e7eb);
+  opacity:.9;
+  border-radius:2px;
+}
+@media (prefers-color-scheme: dark){
+  .rail-wrap::before{ background: #1f2937; }
+}
+
+.frow{
+  display:grid;
+  grid-template-columns: 40px 1fr;
+  gap:18px;
+  align-items:start;
+  margin-bottom:22px;
+}
+@media (min-width: 992px){
+  .frow{
+    grid-template-columns: 60px 1fr 1fr; /* node + two-column panel */
+    gap:24px;
   }
-  .btn-soft:hover{ background: rgba(59,130,246,.26); color:#fff; }
+}
+
+/* node */
+.node{
+  position:relative;
+  width:24px; height:24px; border-radius:50%;
+  border:2px solid #e5e7eb; background:#fff; z-index:1;
+  margin-left:-2px; /* align with rail */
+}
+.node::after{
+  content:"";
+  position:absolute; inset:6px; border-radius:50%; background:#111;
+}
+@media (prefers-color-scheme: dark){
+  .node{ border-color:#334155; background:#0b0f19; }
+  .node::after{ background:#e5e7eb; }
+}
+
+/* panel */
+.panel{
+  grid-column: 2 / -1;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+.panel:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  .panel{ background:#0f172a; border-color:#1f2937; box-shadow: none; }
+  .panel:hover{ box-shadow: 0 16px 36px rgba(0,0,0,.35); }
+}
+
+/* panel layout */
+.panel-head{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;
+}
+.step{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight:800; font-size: .95rem; letter-spacing:.08em;
+  padding:.35rem .6rem; border-radius:999px;
+  border:1px solid #e5e7eb; color:#0f172a; background:#fff;
+}
+@media (prefers-color-scheme: dark){
+  .step{ border-color:#334155; color:#e5e7eb; background:#0b0f19; }
+}
+.panel h3{
+  font-size:1.05rem; font-weight:800; margin:0;
+}
+.panel .desc{
+  color:#64748b; margin: 6px 0 10px; font-size:.95rem;
+}
+@media (prefers-color-scheme: dark){ .panel .desc{ color:#cbd5e1; } }
+
+/* checklist pills */
+.pills{
+  display:flex; flex-wrap:wrap; gap:8px;
+}
+.pill{
+  border:1px solid #e5e7eb;
+  background:#fff;
+  color:#475569;
+  border-radius:999px;
+  padding:.35rem .6rem;
+  font-size:.85rem; font-weight:600;
+}
+@media (prefers-color-scheme: dark){
+  .pill{ border-color:#334155; background:#0b0f19; color:#e2e8f0; }
+}
+
+/* subtle media placeholder (optional icon area) */
+.media-line{
+  display:flex; align-items:center; gap:10px; margin-top:10px;
+  color:#94a3b8; font-size:.9rem;
+}
+.media-icon{
+  width:38px; height:38px; border-radius:10px;
+  border:1px dashed #e5e7eb; display:inline-flex; align-items:center; justify-content:center;
+}
+@media (prefers-color-scheme: dark){
+  .media-icon{ border-color:#334155; }
+}
+
+/* CTAs inside panels */
+.panel .cta{
+  display:inline-flex; align-items:center; gap:.45rem;
+  font-weight:700; font-size:.92rem; text-decoration:none; margin-top:10px;
+  color:#0f172a;
+}
+.panel .cta i{ font-size:1rem; }
+@media (prefers-color-scheme: dark){ .panel .cta{ color:#e5e7eb; } }
+
+/* spacing tweak for last row */
+.frow:last-child{ margin-bottom:0; }
+/* ===================== CONTACT (Modern) ===================== */
+.contact-modern{
+  padding: 96px 0;
+  background:#fff;
+  color:#0f172a;
+}
+@media (prefers-color-scheme: dark){
+  .contact-modern{ background:#0b0f19; color:#e5e7eb; }
+}
+
+.contact-modern .head{
+  text-align:center;
+  max-width:780px;
+  margin:0 auto 32px;
+}
+.contact-modern .eyebrow{
+  font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; color:#94a3b8;
+}
+@media (prefers-color-scheme: dark){ .contact-modern .eyebrow{ color:#64748b; } }
+.contact-modern h2{
+  font-weight:800; line-height:1.15; margin:10px 0 8px;
+}
+.contact-modern .kicker{
+  color:#64748b; max-width:60ch; margin:0 auto;
+}
+@media (prefers-color-scheme: dark){ .contact-modern .kicker{ color:#94a3b8; } }
+
+/* Card */
+.contact-card{
+  max-width:860px;
+  margin: 18px auto 0;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+  padding:24px;
+}
+@media (prefers-color-scheme: dark){
+  .contact-card{
+    background:#0f172a; border-color:#1f2937; box-shadow:none;
+  }
+}
+
+/* Form layout */
+.contact-form .row{ row-gap:14px; }
+.contact-form label.form-label{
+  font-size:.88rem; color:#475569; margin-bottom:.35rem;
+}
+@media (prefers-color-scheme: dark){
+  .contact-form label.form-label{ color:#cbd5e1; }
+}
+
+/* Inputs */
+.contact-form .form-control,
+.contact-form .form-select{
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  color:#0f172a;
+  padding:.7rem .85rem;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.contact-form .form-control:focus,
+.contact-form .form-select:focus{
+  outline:none;
+  border-color:#94a3b8;
+  box-shadow:0 0 0 4px rgba(148,163,184,.2);
+  background:#fff;
+}
+@media (prefers-color-scheme: dark){
+  .contact-form .form-control,
+  .contact-form .form-select{
+    background:#0b0f19; color:#e5e7eb; border-color:#334155;
+  }
+  .contact-form .form-control:focus,
+  .contact-form .form-select:focus{
+    border-color:#475569; box-shadow:0 0 0 4px rgba(71,85,105,.25);
+    background:#0b0f19;
+  }
+}
+
+/* Footer row in form */
+.contact-actions{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  margin-top:4px;
+}
+.contact-actions .form-check-label{ font-size:.92rem; color:#475569; }
+@media (prefers-color-scheme: dark){
+  .contact-actions .form-check-label{ color:#cbd5e1; }
+}
+
+.contact-submit {
+  background: #111;
+  color: #fff;
+  border: 1px solid #111;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: .85rem 1.2rem;
+  transition: background-color .2s ease, border-color .2s ease;
+}
+.contact-submit:hover {
+  background: #000;
+  border-color: #000;
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .contact-submit {
+    background: #e5e7eb;
+    color: #0b0f19;
+    border-color: #e5e7eb;
+  }
+  .contact-submit:hover {
+    background: #fff;
+    border-color: #fff;
+    color: #0b0f19;
+  }
+}
+
+/* Helper note */
+.contact-note{
+  text-align:center; font-size:.9rem; color:#64748b; margin-top:12px;
+}
+@media (prefers-color-scheme: dark){
+  .contact-note{ color:#94a3b8; }
+}
+/* ---------- Simple Footer ---------- */
+.site-footer {
+  background: #fff;
+  color: #0f172a;
+  border-top: 1px solid #e5e7eb;
+  padding: 32px 0;
+  text-align: center;
+}
+@media (prefers-color-scheme: dark) {
+  .site-footer {
+    background: #0b0f19;
+    color: #e5e7eb;
+    border-top-color: #1f2937;
+  }
+}
+.site-footer .brand {
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.2px;
+}
+.site-footer .muted {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  .site-footer .muted {
+    color: #94a3b8;
+  }
+}
+  /* Match About eyebrow + title with Features/Contact */
+.about-enhanced .eyebrow{
+  font-size:.8rem;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:#94a3b8;
+}
+@media (prefers-color-scheme: dark){
+  .about-enhanced .eyebrow{ color:#64748b; }
+}
+.about-enhanced h2{
+  font-weight:800;
+  line-height:1.15;
+  margin:10px 0 8px;
+}
+
+
 </style>
+
 {% endblock %}
 
 {% block content %}
+<!-- ========================= HERO ========================= -->
 
-<!-- HERO: full width & height (no container padding) -->
 <section class="container-fluid px-0 hero-edge">
-  <div class="hero-wrap">
+  <div class="hero-wrap--plain">
+    <div class="hero-bg-particles">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+
     <div class="container-lg hero-inner py-5">
-      <div class="row align-items-center g-4">
-        <div class="col-12 col-lg-7">
-          <div class="small mb-2 d-flex align-items-center gap-2">
-            <i class="bi bi-shield-check"></i>
-            <span>EPICHECK • AI for Youth Health Misinformation</span>
+      <div class="row justify-content-center text-center" style="margin-top:-55px;">
+        <div class="col-12 col-lg-9">
+
+          <div class="small mb-3 text-muted"
+               data-aos="fade-up" data-aos-delay="0">
+            EPICHECK • AI for Youth Health Misinformation
           </div>
 
-          <h1 class="display-5 hero-title">Spot health misinformation.<br>Learn the facts—fast.</h1>
-          <p class="lead muted mb-4">
-            Real-time social content scanning with evidence-based validation and bite-size quizzes.
+          <h1 class="display-4 hero-title--plain mb-3"
+              data-aos="fade-up" data-aos-delay="100">
+            Spot health misinformation.<br>Learn the facts—fast.
+          </h1>
+
+          <p class="lead text-muted mb-4"
+             data-aos="fade-up" data-aos-delay="200">
+            Real-time social content scanning with evidence-based validation and quick quizzes.
           </p>
 
-          <div class="d-flex flex-wrap gap-2">
-            <a href="{{ url_for('monitor') }}" class="btn btn-cta btn-accent">
-              <i class="bi bi-activity me-1"></i> Open Social Monitoring
+          <div class="d-flex flex-wrap justify-content-center gap-2"
+               data-aos="zoom-in" data-aos-delay="300">
+            <a href="{{ url_for('monitor') }}" class="btn btn-cta btn-plain">
+              Open Social Monitoring
             </a>
-            <a href="{{ url_for('quiz_daily') }}" class="btn btn-cta btn-soft">
-              <i class="bi bi-stars me-1"></i> Take Today’s Quiz
+            <a href="{{ url_for('quiz_daily') }}" class="btn btn-cta btn-outline-plain">
+              Take Today’s Quiz
             </a>
+          </div>
 
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ========================= ABOUT (Enhanced Modern) ========================= -->
+<section id="about" class="about-enhanced">
+  <div class="container">
+    <div class="head" data-aos="fade-up">
+      <div class="eyebrow">About</div>
+      <h2>Helping Students Navigate Online Health Information</h2>
+      <p class="kicker">
+        EPICHECK empowers young learners to identify and question online claims by scanning social content,
+        verifying with trusted sources, and reinforcing skills with short, effective quizzes.
+      </p>
+    </div>
+
+    <div class="grid">
+      <div class="item" data-aos="fade-up" data-aos-delay="0">
+        <div class="icon"><i class="bi bi-search"></i></div>
+        <h3>Smart Scanning</h3>
+        <p>Quickly pulls and summarizes health-related claims from popular platforms like YouTube and Reddit.</p>
+      </div>
+
+      <div class="item" data-aos="fade-up" data-aos-delay="100">
+        <div class="icon"><i class="bi bi-journal-check"></i></div>
+        <h3>Trusted Verification</h3>
+        <p>Checks each claim against authoritative sources such as WHO, CDC, and NIH for reliable context.</p>
+      </div>
+
+      <div class="item" data-aos="fade-up" data-aos-delay="200">
+        <div class="icon"><i class="bi bi-lightning-charge"></i></div>
+        <h3>Active Learning</h3>
+        <p>Turns trending topics into classroom-friendly quizzes with instant feedback to strengthen media literacy.</p>
+      </div>
+
+      <div class="item" data-aos="fade-up" data-aos-delay="300">
+        <div class="icon"><i class="bi bi-shield-lock"></i></div>
+        <h3>Safe and Private</h3>
+        <p>Designed for schools with per-user histories, exportable profiles, and privacy controls for admins.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ========================= FEATURES (Rail) ========================= -->
+<section id="features" class="features-rail">
+  <div class="container">
+    <div class="head" data-aos="fade-up">
+      <div class="eyebrow">Features</div>
+      <h2>From scanning to learning — a clear path</h2>
+      <p class="kicker">A connected workflow that turns live social content into classroom-ready learning moments.</p>
+    </div>
+
+    <div class="rail-wrap">
+      <!-- Row 1 -->
+      <div class="frow" data-aos="fade-up" data-aos-delay="0">
+        <div class="node"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Social Monitor</h3>
+            <span class="step">01</span>
+          </div>
+          <p class="desc">Scan YouTube & Reddit, extract key health claims, and auto-summarize long videos/posts.</p>
+          <div class="pills">
+            <span class="pill">Claim extraction</span>
+            <span class="pill">Concise summaries</span>
+            <span class="pill">Trend awareness</span>
+          </div>
+          <div class="media-line">
+            <span class="media-icon"><i class="bi bi-search"></i></span>
+            <span>Works with public links and queries</span>
+          </div>
+          <a class="cta" href="{{ url_for('monitor') }}">Open Monitor <i class="bi bi-arrow-right"></i></a>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="frow" data-aos="fade-up" data-aos-delay="80">
+        <div class="node"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Evidence Checking</h3>
+            <span class="step">02</span>
+          </div>
+          <p class="desc">Verify claims against authoritative guidance (WHO, CDC, NIH) and present clear rationales.</p>
+          <div class="pills">
+            <span class="pill">Clickable citations</span>
+            <span class="pill">Valid / Invalid / Uncertain</span>
+            <span class="pill">Readable rationales</span>
+          </div>
+          <div class="media-line">
+            <span class="media-icon"><i class="bi bi-journal-check"></i></span>
+            <span>Only trusted domains used for validation</span>
           </div>
         </div>
+      </div>
 
-        <div class="col-12 col-lg-5">
-          <div class="feature-card">
-            <div class="d-flex align-items-center mb-2">
-              <i class="bi bi-lightbulb me-2"></i>
-              <strong>How it works</strong>
-            </div>
-            <ol class="mb-0 small">
-              <li>Search trending claims in <em>Monitor</em> (YouTube & Reddit).</li>
-              <li>We flag <span class="text-success">valid</span> / <span class="text-danger">invalid</span> / <span class="text-warning">uncertain</span> posts with citations.</li>
-              <li>Practice with the <em>Daily Quiz</em> and track your score.</li>
-            </ol>
+      <!-- Row 3 -->
+      <div class="frow" data-aos="fade-up" data-aos-delay="160">
+        <div class="node"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Daily Quiz</h3>
+            <span class="step">03</span>
           </div>
+          <p class="desc">Convert topics into 10 quick MCQs with instant explanations to reinforce critical thinking.</p>
+          <div class="pills">
+            <span class="pill">Auto-generated items</span>
+            <span class="pill">First-try scoring</span>
+            <span class="pill">Immediate feedback</span>
+          </div>
+          <div class="media-line">
+            <span class="media-icon"><i class="bi bi-check2-square"></i></span>
+            <span>Great for warm-ups or weekly activities</span>
+          </div>
+          <a class="cta" href="{{ url_for('quiz_daily') }}">Take Today’s Quiz <i class="bi bi-arrow-right"></i></a>
+        </div>
+      </div>
+
+      <!-- Row 4 -->
+      <div class="frow" data-aos="fade-up" data-aos-delay="240">
+        <div class="node"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Privacy & Admin Controls</h3>
+            <span class="step">04</span>
+          </div>
+          <p class="desc">Keep learning safe with per-user histories, exports, and admin settings for schools.</p>
+          <div class="pills">
+            <span class="pill">Per-user history</span>
+            <span class="pill">Export options</span>
+            <span class="pill">School-ready controls</span>
+          </div>
+          <div class="media-line">
+            <span class="media-icon"><i class="bi bi-shield-lock"></i></span>
+            <span>Privacy by design</span>
+          </div>
+          <a class="cta" href="{{ url_for('profile') }}">View Profile <i class="bi bi-arrow-right"></i></a>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Secondary section (optional; can remove for ultra-minimal landing) -->
-<section class="container my-4">
-  <div class="row g-3">
-    <div class="col-12 col-md-4">
-      <div class="feature-card h-100">
-        <div class="d-flex align-items-center mb-2">
-          <i class="bi bi-search me-2"></i><strong>Monitor</strong>
-        </div>
-        <div class="small">Scan social posts, auto-summarize, and validate against WHO/CDC/NIH sources.</div>
-      </div>
+<!-- ========================= CONTACT (Modern) ========================= -->
+<section id="contact" class="contact-modern">
+  <div class="container">
+    <div class="head" data-aos="fade-up">
+      <div class="eyebrow">Contact</div>
+      <h2>Questions or school deployment?</h2>
+      <p class="kicker">Send a message and we’ll get back within 1–2 business days.</p>
     </div>
-    <div class="col-12 col-md-4">
-      <div class="feature-card h-100">
-        <div class="d-flex align-items-center mb-2">
-          <i class="bi bi-check2-square me-2"></i><strong>Daily Quiz</strong>
+
+    <div class="contact-card" data-aos="fade-up" data-aos-delay="80">
+      <form method="post" action="" class="row contact-form">
+        <div class="col-md-6">
+          <label class="form-label">Name</label>
+          <input name="name" class="form-control" required>
         </div>
-        <div class="small">10 quick MCQs with explanations. First-try scoring: +1 correct, +0 wrong.</div>
-      </div>
-    </div>
-    <div class="col-12 col-md-4">
-      <div class="feature-card h-100">
-        <div class="d-flex align-items-center mb-2">
-          <i class="bi bi-person-badge me-2"></i><strong>Profile</strong>
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" required>
         </div>
-        <div class="small">View your recent scores and search history in a clean dashboard.</div>
-      </div>
+        <div class="col-12">
+          <label class="form-label">Organization (optional)</label>
+          <input name="org" class="form-control">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Message</label>
+          <textarea name="message" rows="4" class="form-control" required></textarea>
+        </div>
+
+        <div class="col-12 contact-actions">
+          <button class="btn btn-cta btn-accent contact-submit mx-auto mt-3" type="submit">
+            <i class="bi bi-send me-1"></i> Send Message
+          </button>
+        </div>
+
+        <div class="col-12">
+          <p class="contact-note">We never share your contact details. You can opt out of updates anytime.</p>
+        </div>
+      </form>
     </div>
+
   </div>
 </section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="brand">EPICHECK</div>
+    <p class="muted">AI tools that help students spot health misinformation and learn the facts—fast.</p>
+    <small>© {{ current_year or 2025 }} EPICHECK</small>
+  </div>
+</footer>
+
+
+
 {% endblock %}

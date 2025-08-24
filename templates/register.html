@@ -1,28 +1,131 @@
-{% extends "nav.html" %}
-{% block title %}Register • EPICHECK{% endblock %}
-{% block content %}
-<div class="container" style="max-width: 480px; margin-top: 60px;">
-  <h3>Create account</h3>
-  {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
-  <form method="post" class="mt-3">
-    <div class="mb-3">
-      <label class="form-label">Name (optional)</label>
-      <input name="name" class="form-control" autocomplete="name">
+<!-- templates/nav.html (Login) -->
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Epicheck Login</title>
+
+  <!-- Global libraries -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+
+<style>
+/* Match login & index styling */
+.auth-wrap{
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  background:#fff; color:#111;
+  border-bottom:1px solid #e5e7eb;
+  position:relative; overflow:hidden;
+}
+@media (prefers-color-scheme: dark){
+  .auth-wrap{ background:#0b0f19; color:#e5e7eb; border-bottom-color:#1f2937; }
+}
+.hero-bg-particles{ position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.hero-bg-particles span{
+  position:absolute; display:block; border-radius:50%; opacity:.8; filter:blur(4px);
+  animation:float-particle linear infinite;
+}
+.hero-bg-particles span:nth-child(1){ width:120px;height:120px;background:rgba(96,165,250,.25); top:12%; left:18%; animation-duration:18s; }
+.hero-bg-particles span:nth-child(2){ width:180px;height:180px;background:rgba(244,114,182,.20); top:42%; left:70%; animation-duration:24s; animation-delay:-6s; }
+.hero-bg-particles span:nth-child(3){ width:90px;height:90px;background:rgba(167,139,250,.25); top:72%; left:22%; animation-duration:20s; animation-delay:-3s; }
+.hero-bg-particles span:nth-child(4){ width:150px;height:150px;background:rgba(59,130,246,.18); top:26%; left:50%; animation-duration:28s; animation-delay:-10s; }
+.hero-bg-particles span:nth-child(5){ width:100px;height:100px;background:rgba(250,204,21,.18); top:82%; left:80%; animation-duration:22s; animation-delay:-5s; }
+@keyframes float-particle{
+  0%{ transform:translateY(0) translateX(0) scale(1); }
+  50%{ transform:translateY(-50px) translateX(30px) scale(1.05); }
+  100%{ transform:translateY(0) translateX(0) scale(1); }
+}
+.auth-card{
+  position:relative; z-index:1;
+  width:100%; max-width:460px;
+  border-radius:16px; padding:28px 24px;
+  background: rgba(255,255,255,.78);
+  border:1px solid rgba(148,163,184,.28);
+  backdrop-filter: blur(10px);
+  box-shadow:0 10px 28px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  .auth-card{ background: rgba(15,17,23,.72); border-color: rgba(255,255,255,.10); box-shadow:none; }
+}
+.auth-head { text-align:center; margin-bottom:12px; }
+.auth-head .eyebrow{
+  font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; color:#94a3b8;
+}
+@media (prefers-color-scheme: dark){ .auth-head .eyebrow{ color:#64748b; } }
+.auth-head h4{
+  font-weight:800; line-height:1.15; margin:8px 0 0;
+}
+.form-label{ font-size:.9rem; color:#475569; margin-bottom:.35rem; }
+@media (prefers-color-scheme: dark){ .form-label{ color:#cbd5e1; } }
+.form-control{
+  border-radius:10px; border:1px solid #e5e7eb; background:#fff; color:#0f172a;
+  padding:.75rem .9rem; transition:border-color .15s ease, box-shadow .15s ease;
+}
+.form-control:focus{
+  outline:none; border-color:#94a3b8; box-shadow:0 0 0 4px rgba(148,163,184,.2);
+}
+@media (prefers-color-scheme: dark){
+  .form-control{ background:#0b0f19; color:#e5e7eb; border-color:#334155; }
+  .form-control:focus{ border-color:#475569; box-shadow:0 0 0 4px rgba(71,85,105,.25); }
+}
+.btn-auth{
+  display:inline-flex; align-items:center; justify-content:center; gap:.4rem;
+  width:100%;
+  border-radius:10px; padding:.9rem 1.1rem; font-weight:700;
+  background:#111; color:#fff; border:1px solid #111;
+  transition: background-color .2s ease, border-color .2s ease;
+}
+.btn-auth:hover{ background:#000; border-color:#000; }
+@media (prefers-color-scheme: dark){
+  .btn-auth{ background:#e5e7eb; color:#0b0f19; border-color:#e5e7eb; }
+  .btn-auth:hover{ background:#fff; border-color:#fff; color:#0b0f19; }
+}
+</style>
+
+<section class="auth-wrap">
+  <div class="hero-bg-particles">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="auth-card">
+    <div class="auth-head">
+      <div class="eyebrow">Join EPICHECK</div>
+      <h4>Create account</h4>
     </div>
-    <div class="mb-3">
-      <label class="form-label">Email</label>
-      <input name="email" type="email" class="form-control" required autocomplete="email">
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Password (min 8 chars)</label>
-      <input name="password" type="password" class="form-control" required autocomplete="new-password">
-    </div>
-    <div class="mb-4">
-      <label class="form-label">Confirm Password</label>
-      <input name="confirm" type="password" class="form-control" required autocomplete="new-password">
-    </div>
-    <button class="btn btn-primary w-100" type="submit">Sign up</button>
-    <p class="mt-3">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
-  </form>
-</div>
-{% endblock %}
+
+    {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
+
+    <form method="post" class="mt-3">
+      {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <div class="mb-3">
+        <label class="form-label">Name (optional)</label>
+        <input name="name" class="form-control" autocomplete="name">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input name="email" type="email" class="form-control" required autocomplete="email">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password (min 8 chars)</label>
+        <input name="password" type="password" class="form-control" required autocomplete="new-password">
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Confirm Password</label>
+        <input name="confirm" type="password" class="form-control" required autocomplete="new-password">
+      </div>
+      <button class="btn-auth" type="submit">
+        <i class="bi bi-person-plus"></i> Sign up
+      </button>
+      <p class="mt-3 text-center" style="font-size:.9rem;">
+        Already have an account? <a href="{{ url_for('login') }}">Log in</a>
+      </p>
+    </form>
+  </div>
+</section>
+</body>
+</html>

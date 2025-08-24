@@ -1,0 +1,168 @@
+{% extends "nav.html" %}
+{% block title %}Campaigns • EPICHECK{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ---- Tokens (align with index/profile) ---- */
+:root{
+  --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --panel:#ffffff; --glass:rgba(255,255,255,.70);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --ink:#e5e7eb; --muted:#94a3b8; --line:#1f2937; --panel:#0b0f19; --glass:rgba(23,25,35,.65); }
+}
+
+/* ---- Hero (neutral + soft particles) ---- */
+.page-hero{
+  position:relative; border-radius:20px; padding:24px;
+  background:var(--panel); border:1px solid var(--line);
+  box-shadow:0 10px 28px rgba(0,0,0,.06); overflow:hidden;
+}
+.page-hero .bg-particles{ position:absolute; inset:0; pointer-events:none; }
+.page-hero .bg-particles span{
+  position:absolute; display:block; border-radius:50%; opacity:.7; filter:blur(6px);
+  animation:float linear infinite;
+}
+.page-hero .bg-particles span:nth-child(1){ width:120px;height:120px;background:rgba(96,165,250,.16); top:8%; left:10%; animation-duration:18s; }
+.page-hero .bg-particles span:nth-child(2){ width:160px;height:160px;background:rgba(167,139,250,.14); top:60%; left:75%; animation-duration:24s; animation-delay:-6s; }
+.page-hero .bg-particles span:nth-child(3){ width:90px;height:90px;background:rgba(244,114,182,.12); top:20%; left:82%; animation-duration:20s; animation-delay:-3s; }
+@keyframes float{ 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(24px,-36px) scale(1.06)} 100%{transform:translate(0,0) scale(1)} }
+
+.head .eyebrow{ font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.head .title{ margin:.2rem 0 .2rem; font-weight:800; line-height:1.15; color:var(--ink); }
+.head .kicker{ color:var(--muted); }
+
+/* ---- Glass ---- */
+.glass{
+  background:var(--glass); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border-radius:16px; border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 10px 24px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){ .glass{ border-color:rgba(255,255,255,.08); } }
+
+/* ---- Buttons (low-color) ---- */
+.btn-clean{
+  border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:700;
+  border-radius:10px; padding:.55rem 1rem; transition:background .18s,border-color .18s,box-shadow .18s;
+}
+.btn-clean:hover{ background:#f8fafc; border-color:#cbd5e1; box-shadow:0 6px 14px rgba(0,0,0,.06); }
+@media (prefers-color-scheme: dark){
+  .btn-clean{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .btn-clean:hover{ background:#111827; border-color:#334155; }
+}
+
+/* ---- List items ---- */
+.camp-item{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:14px 16px; border:1px solid var(--line); border-radius:14px; background:#fff;
+  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  text-decoration:none;
+}
+.camp-item:hover{ transform:translateY(-2px); box-shadow:0 14px 30px rgba(0,0,0,.08); border-color:#cbd5e1; }
+@media (prefers-color-scheme: dark){
+  .camp-item{ background:#0f172a; border-color:#1f2937; }
+  .camp-item:hover{ border-color:#334155; box-shadow:0 16px 36px rgba(0,0,0,.30); }
+}
+.camp-title{ font-weight:700; color:var(--ink); margin:0; }
+.camp-meta{ font-size:.92rem; color:var(--muted); }
+
+/* Badges */
+.badge-visibility{
+  border-radius:999px; padding:.35rem .6rem; font-weight:700; border:1px solid var(--line);
+  background:#fff; color:#334155;
+}
+@media (prefers-color-scheme: dark){
+  .badge-visibility{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+.small-muted{ color:var(--muted); font-size:.9rem; }
+
+/* Empty state */
+.empty{
+  text-align:center; padding:28px; border-radius:16px; border:1px dashed var(--line);
+  color:var(--muted); background:#fff;
+}
+@media (prefers-color-scheme: dark){
+  .empty{ background:#0b0f19; border-color:#1f2937; }
+}
+  .camp-item{ cursor:pointer; }               /* clickable card */
+.camp-title a{ text-decoration:none; color:var(--ink); }
+.camp-title a:hover{ text-decoration:underline; }
+
+.public-link{
+  text-decoration:none;
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.28rem .55rem; border-radius:999px; font-weight:700; font-size:.86rem;
+  border:1px solid var(--line); background:#fff; color:#334155;
+}
+.public-link i{ font-size:.95em; }
+@media (prefers-color-scheme: dark){
+  .public-link{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+.chevron{ color:var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container my-3">
+  <div class="page-hero">
+    <div class="bg-particles"><span></span><span></span><span></span></div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center head position-relative">
+      <div>
+        <div class="eyebrow">Campaigns</div>
+        <h2 class="title mb-0">Your Campaigns</h2>
+        <p class="kicker mb-0">Create weekly myth-busting plans and share public pages with a single link.</p>
+      </div>
+      <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+        <a class="btn btn-clean" href="{{ url_for('campaigns_new') }}">
+          <i class="bi bi-plus-lg me-1"></i> New Campaign
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container my-3">
+  {% if rows %}
+    <div class="glass p-3">
+      <div class="row g-2">
+        {% for c in rows %}
+        <div class="col-12">
+          <div class="camp-item"
+               onclick="if(!event.target.closest('a,button')) window.location='{{ url_for('campaigns_view', campaign_id=c.id) }}'">
+            <div>
+              <h6 class="camp-title mb-1">
+                <a href="{{ url_for('campaigns_view', campaign_id=c.id) }}">{{ c.title }}</a>
+              </h6>
+              <div class="camp-meta mb-1">
+                {{ c.topic }} • {{ c.audience.replace('_',' ').title() }} • Starts {{ c.starts_on }}
+              </div>
+
+              {% if c.visibility == 'public' %}
+                <a class="public-link"
+                   href="{{ url_for('campaigns_public', slug=c.slug) }}"
+                   target="_blank" rel="noreferrer"
+                   onclick="event.stopPropagation();">
+                  <i class="bi bi-box-arrow-up-right"></i> Public Link
+                </a>
+              {% else %}
+                <span class="badge-visibility">Private</span>
+              {% endif %}
+            </div>
+
+            <div class="d-none d-md-block">
+              <i class="bi bi-chevron-right chevron"></i>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+  {% else %}
+    <div class="glass empty">
+      <div class="mb-1 fw-bold">No campaigns yet</div>
+      <div class="small-muted mb-3">Plan a 4-week myth-busting series with quizzes, prompts, and shareable posts.</div>
+      <a class="btn btn-clean" href="{{ url_for('campaigns_new') }}"><i class="bi bi-plus-lg me-1"></i> Create your first campaign</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

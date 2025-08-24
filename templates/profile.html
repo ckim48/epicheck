@@ -1,63 +1,175 @@
 {% extends "nav.html" %}
 {% block title %}Profile • EPICHECK{% endblock %}
+
 {% block extra_head %}
 <style>
-  .dash-hero{
-    border-radius: 20px; padding: 26px; color:#fff; position:relative; overflow:hidden;
-    background: linear-gradient(135deg,#0f172a 0%, #1e293b 65%);
-    box-shadow: 0 10px 28px rgba(0,0,0,.12);
+/* ---------- Local theme tokens (match index vibe) ---------- */
+:root{
+  --ink:#0f172a;
+  --muted:#64748b;
+  --line:#e5e7eb;
+  --panel:#ffffff;
+  --glass: rgba(255,255,255,.70);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#e5e7eb;
+    --muted:#94a3b8;
+    --line:#1f2937;
+    --panel:#0b0f19;
+    --glass: rgba(23,25,35,.65);
   }
-  .dash-hero::after{
-    content:""; position:absolute; inset:-15%;
-    background:
-      radial-gradient(600px 180px at 0% 0%, rgba(99,102,241,.35), transparent 55%),
-      radial-gradient(600px 180px at 100% 120%, rgba(16,185,129,.35), transparent 55%);
-    pointer-events:none;
-  }
-  .glass{ background: rgba(255,255,255,.70); backdrop-filter: blur(12px);
-          border-radius: 16px; border:1px solid rgba(255,255,255,.35);
-          box-shadow: 0 10px 24px rgba(0,0,0,.08); }
-  @media (prefers-color-scheme: dark){
-    .glass{ background: rgba(23,25,35,.65); border-color: rgba(255,255,255,.08); }
-  }
-  .stat-card{ padding:18px; }
-  .stat-k{ font-weight:800; font-size:1.6rem; line-height:1; }
-  .muted{ color:#6b7280; } @media (prefers-color-scheme: dark){ .muted{ color:#98a2b3; } }
-  .badge-pill{ border-radius:999px; padding:.35rem .6rem; font-weight:700; }
-  .badge-daily{ background:rgba(99,102,241,.15); color:#6366f1; }
-  .badge-custom{ background:rgba(16,185,129,.15); color:#10b981; }
-  .table thead th{ font-size:.82rem; letter-spacing:.02em; text-transform:uppercase; }
-  .kw-chip{
-    display:inline-flex; align-items:center; gap:.4rem;
-    padding:.4rem .6rem; border-radius:999px; font-weight:600;
-    background: rgba(0,0,0,.06);
-  }
-  @media (prefers-color-scheme: dark){
-    .kw-chip{ background: rgba(255,255,255,.10); }
-  }
-  .mini-pill{ border-radius:999px; padding:.2rem .45rem; font-size:.75rem; }
-  .p-valid{ background:rgba(34,197,94,.18); color:#16a34a; }
-  .p-invalid{ background:rgba(239,68,68,.18); color:#dc2626; }
-  .p-uncertain{ background:rgba(234,179,8,.20); color:#b45309; }
-  .progress{ height:8px; background: rgba(0,0,0,.08); }
-  @media (prefers-color-scheme: dark){ .progress{ background: rgba(255,255,255,.12); } }
+}
+
+/* ---------- Hero (neutral panel + particles) ---------- */
+.dash-hero{
+  position:relative;
+  border-radius:20px;
+  padding:26px;
+  background: var(--panel);
+  border:1px solid var(--line);
+  box-shadow: 0 10px 28px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+.dash-hero .hero-bg-particles{ position:absolute; inset:0; pointer-events:none; z-index:0; }
+.dash-hero .hero-bg-particles span{
+  position:absolute; display:block; border-radius:50%; opacity:.7; filter: blur(6px);
+  animation: float-particle linear infinite;
+}
+.dash-hero .hero-bg-particles span:nth-child(1){ width:120px; height:120px; background:rgba(96,165,250,.16); top:8%; left:12%; animation-duration:18s; }
+.dash-hero .hero-bg-particles span:nth-child(2){ width:180px; height:180px; background:rgba(167,139,250,.14); top:64%; left:72%; animation-duration:24s; animation-delay:-6s; }
+.dash-hero .hero-bg-particles span:nth-child(3){ width:90px; height:90px; background:rgba(244,114,182,.12); top:22%; left:80%; animation-duration:20s; animation-delay:-3s; }
+@keyframes float-particle{
+  0%{transform: translateY(0) translateX(0) scale(1)}
+  50%{transform: translateY(-38px) translateX(22px) scale(1.06)}
+  100%{transform: translateY(0) translateX(0) scale(1)}
+}
+
+/* ---------- Head/eyebrow (unified with index) ---------- */
+.head{ position:relative; z-index:1; }
+.eyebrow{
+  font-size:.8rem; letter-spacing:.16em; text-transform:uppercase;
+  color: var(--muted);
+}
+.page-title{
+  margin:.25rem 0 .25rem; font-weight:800; line-height:1.15; color:var(--ink);
+}
+.kicker{ color: var(--muted); }
+
+/* ---------- Glass / panels ---------- */
+.glass{
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.35);
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  .glass{ border-color: rgba(255,255,255,.08); }
+}
+
+/* ---------- Buttons (neutral, low-color like index) ---------- */
+.btn-clean{
+  border:1px solid var(--line);
+  background:#fff;
+  color: var(--ink);
+  font-weight:700; border-radius:10px; padding:.55rem 1rem;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.btn-clean:hover{ background:#f8fafc; border-color:#cbd5e1; box-shadow:0 6px 14px rgba(0,0,0,.06); }
+@media (prefers-color-scheme: dark){
+  .btn-clean{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .btn-clean:hover{ background:#111827; border-color:#334155; }
+}
+
+/* ---------- Stats ---------- */
+.stat-card{ padding:18px; }
+.stat-k{ font-weight:800; font-size:1.6rem; line-height:1; color:var(--ink); }
+.muted{ color:var(--muted); }
+
+/* ---------- Badges / chips ---------- */
+.badge-pill{ border-radius:999px; padding:.35rem .6rem; font-weight:700; border:1px solid var(--line); }
+.badge-daily{ background:#fff; color:#334155; }
+.badge-custom{ background:#fff; color:#334155; }
+@media (prefers-color-scheme: dark){
+  .badge-pill{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+
+.kw-chip{
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.4rem .6rem; border-radius:999px; font-weight:700;
+  background:#fff; border:1px solid var(--line); color:var(--ink);
+}
+@media (prefers-color-scheme: dark){
+  .kw-chip{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+
+.mini-pill{ border-radius:999px; padding:.18rem .5rem; font-size:.75rem; font-weight:700; border:1px solid transparent; }
+.p-valid{ background:rgba(34,197,94,.12); color:#16a34a; }
+.p-invalid{ background:rgba(239,68,68,.12); color:#dc2626; }
+.p-uncertain{ background:rgba(234,179,8,.14); color:#b45309; }
+
+/* ---------- Table / progress ---------- */
+.table thead th{ font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); border-bottom-color:var(--line); }
+.progress{ height:8px; background: rgba(0,0,0,.08); }
+@media (prefers-color-scheme: dark){ .progress{ background: rgba(255,255,255,.12); } }
 </style>
+<style>
+  .post-details{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .prewrap{ white-space:pre-wrap; }
+  .muted-label{ font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+</style>
+<style>
+  /* Right-aligned action group in the Link column */
+  td.table-actions{ white-space:nowrap; }
+  .link-actions{
+    display:flex; justify-content:flex-end; align-items:center; gap:.4rem;
+    min-width:136px;
+  }
+  .icon-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:32px; height:32px; border-radius:8px;
+    border:1px solid var(--line); background:#fff; cursor:pointer;
+    transition: background .18s, border-color .18s, box-shadow .18s, transform .06s;
+  }
+  .icon-btn:focus{ outline:2px solid rgba(59,130,246,.6); outline-offset:2px; }
+  .icon-btn:hover{ background:#f8fafc; border-color:#cbd5e1; box-shadow:0 6px 14px rgba(0,0,0,.06); }
+  .icon-btn:active{ transform: translateY(1px); }
+  .icon-btn > i{ font-size:1rem; line-height:0; }
+
+  /* tiny status chip used for “Copied!” feedback */
+  .chip-mini{
+    font-size:.72rem; font-weight:700; padding:.18rem .45rem; border-radius:999px;
+    border:1px solid var(--line); background:#fff; color:var(--muted);
+  }
+
+  @media (prefers-color-scheme: dark){
+    .icon-btn, .chip-mini{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+    .icon-btn:hover{ background:#111827; border-color:#334155; }
+  }
+</style>
+
 {% endblock %}
 
 {% block content %}
 <section class="container my-3">
   <div class="dash-hero">
-    <div class="d-flex flex-wrap align-items-center justify-content-between">
-      <div>
-        <h4 class="mb-1">{{ 'Guest Dashboard' if is_guest else (user.name or 'Your Dashboard') }}</h4>
-        <div class="muted small">
-          {{ 'You are viewing a guest session (scores saved to this browser).' if is_guest else (user.email or '') }}
+    <div class="hero-bg-particles"><span></span><span></span><span></span></div>
+    <div class="head">
+      <div class="eyebrow">Profile</div>
+      <div class="d-flex flex-wrap align-items-center justify-content-between">
+        <h2 class="page-title mb-0">
+          {{ 'Guest Dashboard' if is_guest else (user.name or 'Your Dashboard') }}
+        </h2>
+        <div class="d-flex align-items-center gap-2">
+          <a class="btn btn-clean btn-sm" href="{{ url_for('quiz_daily') }}"><i class="bi bi-stars me-1"></i> Daily Quiz</a>
+          <a class="btn btn-clean btn-sm" href="{{ url_for('monitor') }}"><i class="bi bi-activity me-1"></i> Monitor</a>
         </div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-light btn-sm" href="{{ url_for('quiz_daily') }}"><i class="bi bi-stars me-1"></i> Daily Quiz</a>
-        <a class="btn btn-outline-light btn-sm" href="{{ url_for('monitor') }}"><i class="bi bi-activity me-1"></i> Monitor</a>
-      </div>
+      <p class="kicker mb-0">
+        {{ 'You are viewing a guest session (scores saved to this browser).' if is_guest else (user.email or '') }}
+      </p>
     </div>
   </div>
 </section>
@@ -97,8 +209,10 @@
 <section class="container my-3">
   <div class="glass p-3">
     <div class="d-flex align-items-center justify-content-between">
-      <h6 class="mb-0">Recent Quiz Attempts</h6>
-      <a class="btn btn-sm btn-clean" href="{{ url_for('quiz_daily') }}"><i class="bi bi-play-circle me-1"></i>Take another</a>
+      <div class="head mb-0">
+        <div class="eyebrow">Activity</div>
+        <h3 class="page-title" style="font-size:1.15rem; margin:0;">Recent Quiz Attempts</h3>
+      </div>
     </div>
     <div class="table-responsive mt-2">
       <table class="table align-middle mb-0">
@@ -106,7 +220,6 @@
           <tr>
             <th>Date</th>
             <th>Topic</th>
-            <th>Type</th>
             <th class="text-center">Progress</th>
             <th class="text-end">Score</th>
           </tr>
@@ -117,18 +230,14 @@
             <tr>
               <td class="small">{{ a.started_at|dt }}</td>
               <td class="fw-semibold">{{ a.topic }}</td>
-              <td>
-                {% if a.is_daily %}
-                  <span class="badge-pill badge-daily">Daily</span>
-                {% else %}
-                  <span class="badge-pill badge-custom">Custom</span>
-                {% endif %}
-              </td>
+
               <td class="text-center" style="min-width:160px;">
                 {% set total = a.total_items or 0 %}
                 {% set ans = a.answered or 0 %}
                 {% set pct = (ans / total * 100) if total>0 else 0 %}
-                <div class="progress"><div class="progress-bar" role="progressbar" style="width: {{ pct|round(0) }}%"></div></div>
+                <div class="progress">
+                  <div class="progress-bar" role="progressbar" style="width: {{ pct|round(0) }}%"></div>
+                </div>
                 <div class="small muted mt-1">{{ ans }}/{{ total }} answered</div>
               </td>
               <td class="text-end fw-bold">{{ a.score }}</td>
@@ -146,28 +255,289 @@
 <section class="container my-3">
   <div class="glass p-3">
     <div class="d-flex align-items-center justify-content-between">
-      <h6 class="mb-0">Recent Searches</h6>
-      <a class="btn btn-sm btn-clean" href="{{ url_for('monitor') }}"><i class="bi bi-activity me-1"></i>Open Monitor</a>
+      <div class="head mb-0">
+        <div class="eyebrow">Searches</div>
+        <h3 class="page-title" style="font-size:1.15rem; margin:0;">Recent Searches</h3>
+      </div>
+      <a class="btn btn-clean btn-sm" href="{{ url_for('monitor') }}"><i class="bi bi-activity me-1"></i> Open Monitor</a>
     </div>
     <div class="mt-2">
       {% if searches %}
         {% for s in searches %}
-          <div class="d-flex flex-wrap align-items-center justify-content-between py-2 border-bottom border-opacity-25">
-            <div class="d-flex align-items-center gap-2">
-              <span class="kw-chip"><i class="bi bi-search"></i> {{ s.keywords }}</span>
-              <span class="small muted">on {{ s.created_at|dt }}</span>
-            </div>
-            <div class="d-flex align-items-center gap-1">
-              <span class="mini-pill p-valid">Valid {{ s.valid_count or 0 }}</span>
-              <span class="mini-pill p-invalid">Invalid {{ s.invalid_count or 0 }}</span>
-              <span class="mini-pill p-uncertain">Uncertain {{ s.uncertain_count or 0 }}</span>
-            </div>
-          </div>
+         <div class="d-flex flex-wrap align-items-center justify-content-between py-2 border-bottom"
+     style="border-color:var(--line) !important;"
+     data-search-row="{{ s.id }}">
+  <div class="d-flex align-items-center gap-2">
+    <span class="kw-chip"><i class="bi bi-search"></i> {{ s.keywords }}</span>
+    <span class="small muted">on {{ s.created_at|dt }}</span>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-1 me-2">
+      <span class="mini-pill p-valid">Valid {{ s.valid_count or 0 }}</span>
+      <span class="mini-pill p-invalid">Invalid {{ s.invalid_count or 0 }}</span>
+      <span class="mini-pill p-uncertain">Uncertain {{ s.uncertain_count or 0 }}</span>
+    </div>
+
+    <!-- View details -->
+    <button type="button"
+            class="btn btn-clean btn-sm"
+            data-view-search="{{ s.id }}"
+            title="View saved posts"
+            aria-label="View saved posts">
+      <i class="bi bi-eye"></i>
+    </button>
+
+    <!-- Delete -->
+    <button type="button"
+            class="btn btn-clean btn-sm"
+            data-delete-search="{{ s.id }}"
+            title="Delete this search"
+            aria-label="Delete this search">
+      <i class="bi bi-trash"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Hidden details panel (filled on demand) -->
+<div class="search-details d-none" id="search-details-{{ s.id }}"></div>
+
         {% endfor %}
+
       {% else %}
         <div class="text-center text-muted py-4">No searches yet.</div>
       {% endif %}
     </div>
   </div>
 </section>
+<script>
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-delete-search]');
+  if (!btn) return;
+
+  const id = btn.getAttribute('data-delete-search');
+  if (!id) return;
+
+  // Optional confirm
+  if (!confirm('Delete this search and its saved posts?')) return;
+
+  try {
+    const res = await fetch(`/searches/${id}/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({}) // no payload needed
+    });
+    const data = await res.json();
+
+    if (res.ok && data.ok) {
+      // Remove the row from DOM
+      const row = document.querySelector(`[data-search-row="${id}"]`);
+      if (row) row.remove();
+    } else {
+      alert(data.error || 'Failed to delete. Please try again.');
+    }
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
+});
+</script>
+<script>
+function verdictPill(v) {
+  const m = (v||'').toLowerCase();
+  const cls = m==='valid' ? 'p-valid'
+            : m==='invalid' ? 'p-invalid'
+            : 'p-uncertain';
+  const label = m.charAt(0).toUpperCase()+m.slice(1);
+  return `<span class="mini-pill ${cls}">${label}</span>`;
+}
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function postRow(p) {
+  const when   = p.created_at || '';
+  const author = esc(p.author || '');
+  const text   = p.text || '';
+  const textEsc = esc(text);
+  const explain = esc(p.explanation || '');
+  const transcript = esc(p.transcript_excerpt || '');
+  const cred = (p.credibility_score ?? '').toString().slice(0,4);
+  const pid = p.id || `p_${Math.random().toString(36).slice(2)}`;
+const openBtn = p.url
+  ? `<a class="icon-btn" href="${p.url}" target="_blank" rel="noopener"
+        title="Open link" aria-label="Open link">
+       <i class="bi bi-box-arrow-up-right"></i>
+     </a>`
+  : `<span class="icon-btn" title="No link" aria-hidden="true"
+           style="opacity:.5; pointer-events:none;">
+       <i class="bi bi-box-arrow-up-right"></i>
+     </span>`;
+
+const toggleBtn = `
+  <button class="icon-btn" type="button"
+          data-toggle-post="${pid}"
+          title="Show details" aria-label="Show details"
+          aria-expanded="false" aria-controls="post-details-${pid}">
+    <i class="bi bi-chevron-down"></i>
+  </button>`;
+
+// MAIN ROW (note: two separate cells now: one for Link, one for Details)
+const main = `
+  <tr data-post="${pid}">
+    <td class="small">${p.platform || '—'}</td>
+    <td class="small">${author}</td>
+    <td class="small">${verdictPill(p.verdict)}</td>
+    <td class="small">${cred}</td>
+    <td class="small">${when}</td>
+    <td class="small text-truncate" style="max-width:380px;" title="${textEsc}">
+      ${esc(text.slice(0,200))}${text.length>200?'…':''}
+    </td>
+    <td class="table-actions">
+      <div class="actions-right">
+        ${openBtn}
+      </div>
+    </td>
+    <td class="table-actions">
+      <div class="actions-right">
+        ${toggleBtn}
+      </div>
+    </td>
+  </tr>`;
+
+// DETAILS ROW (colspan increases by 1 to cover the new column => 8 total)
+const details = `
+  <tr class="d-none" data-post-details="${pid}" id="post-details-${pid}">
+    <td colspan="8">
+      <div class="post-details">
+        <div class="mb-2">
+          <div class="muted-label">Full Text</div>
+          <div class="prewrap">${textEsc || '—'}</div>
+        </div>
+        <div class="mb-2">
+          <div class="muted-label">Explanation</div>
+          <div class="prewrap">${explain || '—'}</div>
+        </div>
+        ${transcript ? `
+          <div class="mb-1">
+            <div class="muted-label">Transcript Excerpt</div>
+            <div class="prewrap">${transcript}</div>
+          </div>` : ''}
+      </div>
+    </td>
+  </tr>`;
+  return main + details;
+}
+
+
+async function loadSearchPosts(id, panel) {
+  panel.innerHTML = `
+    <div class="glass p-3 mt-2">
+      <div class="small muted">Loading saved posts…</div>
+    </div>`;
+  try {
+    const res = await fetch(`/api/monitor/posts?search_id=${id}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data && data.error || 'Failed to load');
+
+    const rows = (data || []).map(postRow).join('') || `
+      <tr><td colspan="7" class="text-center text-muted py-3">No posts saved for this search.</td></tr>
+    `;
+
+    panel.innerHTML = `
+      <div class="glass p-3 mt-2">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Author</th>
+                <th>Verdict</th>
+                <th>Cred.</th>
+                <th>When</th>
+                <th>Contents</th>
+                <th class="text-end">Link</th>
+
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (e) {
+    panel.innerHTML = `
+      <div class="glass p-3 mt-2">
+        <div class="text-danger small">Could not load posts. Please try again.</div>
+      </div>`;
+  }
+}
+document.addEventListener('click', async (e) => {
+  // Delete a saved search
+  const delBtn = e.target.closest('[data-delete-search]');
+  if (delBtn) {
+    const id = delBtn.getAttribute('data-delete-search');
+    if (!id) return;
+    if (!confirm('Delete this search and its saved posts?')) return;
+
+    try {
+      const res = await fetch(`/searches/${id}/delete`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json','X-Requested-With':'XMLHttpRequest'},
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        const row = document.querySelector(`[data-search-row="${id}"]`);
+        if (row) row.remove();
+      } else {
+        alert(data.error || 'Failed to delete. Please try again.');
+      }
+    } catch {
+      alert('Network error. Please try again.');
+    }
+    return;
+  }
+
+  // Open/close the details table under a search
+  const viewBtn = e.target.closest('[data-view-search]');
+  if (viewBtn) {
+    const id = viewBtn.getAttribute('data-view-search');
+    const panel = document.getElementById(`search-details-${id}`);
+    if (!panel) return;
+
+    const isHidden = panel.classList.contains('d-none');
+    document.querySelectorAll('.search-details').forEach(el => el.classList.add('d-none'));
+    if (isHidden) {
+      panel.classList.remove('d-none');
+      if (!panel.dataset.loaded) {
+        await loadSearchPosts(id, panel);
+        panel.dataset.loaded = '1';
+      }
+    }
+    return;
+  }
+
+  // Expand/collapse an individual post
+  const tbtn = e.target.closest('[data-toggle-post]');
+  if (tbtn) {
+    const pid = tbtn.getAttribute('data-toggle-post');
+    const row = document.querySelector(`[data-post-details="${pid}"]`);
+    if (!row) return;
+
+    const willShow = row.classList.contains('d-none');
+    row.classList.toggle('d-none');
+
+    const icon = tbtn.querySelector('i');
+    if (icon) {
+      icon.classList.toggle('bi-chevron-down', !willShow);
+      icon.classList.toggle('bi-chevron-up', willShow);
+    }
+    tbtn.setAttribute('aria-expanded', String(willShow));
+    tbtn.setAttribute('title', willShow ? 'Hide details' : 'Show details');
+  }
+});
+
+
+</script>
+
 {% endblock %}

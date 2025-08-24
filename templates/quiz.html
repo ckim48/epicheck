@@ -1,223 +1,360 @@
 {% extends "nav.html" %}
 {% block title %}Quiz • EPICHECK{% endblock %}
+
 {% block extra_head %}
 <style>
-  /* ==== Self-contained styles (no CSS variables required) ==== */
-    body{
-      color:black;
-    }
-            h3{
-              color:black;
-            }
-  /* HERO */
-  .quiz-hero{
-    border-radius: 20px;
-    padding: 28px;
-    color:#fff;
-    position:relative; overflow:hidden;
-    background: linear-gradient(135deg,#111827 0%, #1f2937 60%);
-    box-shadow: 0 10px 28px rgba(0,0,0,.10);
+/* ---------- Theme tokens (local to this page) ---------- */
+:root{
+  --ink:#0f172a;
+  --muted:#64748b;
+  --line:#e5e7eb;
+  --panel:#ffffff;
+  --glass: rgba(255,255,255,.70);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#e5e7eb;
+    --muted:#94a3b8;
+    --line:#1f2937;
+    --panel:#0b0f19;
+    --glass: rgba(23,25,35,.65);
   }
-  #pointCounter{
-    color:black;
-  }
-  .quiz-hero::after{
-    content:""; position:absolute; inset:-20%;
-    background:
-      radial-gradient(700px 180px at 6% -10%, rgba(99,102,241,.35), transparent 55%),
-      radial-gradient(700px 180px at 96% 120%, rgba(16,185,129,.35), transparent 55%);
-    pointer-events:none;
-  }
+}
 
-  /* GLASS CARD (explicit colors; no vars) */
-  .glass {
-    background: rgba(255,255,255,.70);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-    border-radius: 18px;
-    border: 1px solid rgba(255,255,255,0.35);
-    box-shadow: 0 10px 28px rgba(0,0,0,.08);
-  }
-  @media (prefers-color-scheme: dark){
-    .glass {
-      background: rgba(23,25,35,.65);
-      border-color: rgba(255,255,255,.08);
-    }
-  }
+/* ---------- Page hero (matches index tone) ---------- */
+.quiz-hero{
+  position:relative;
+  border-radius:20px;
+  padding:28px;
+  background: var(--panel);
+  border:1px solid var(--line);
+  box-shadow: 0 10px 28px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+.quiz-hero .hero-bg-particles{ position:absolute; inset:0; pointer-events:none; z-index:0; }
+.quiz-hero .hero-bg-particles span{
+  position:absolute; display:block; border-radius:50%; opacity:.7; filter: blur(6px);
+  animation: float-particle linear infinite;
+}
+.quiz-hero .hero-bg-particles span:nth-child(1){ width:120px; height:120px; background:rgba(96,165,250,.16); top:8%; left:12%; animation-duration:18s; }
+.quiz-hero .hero-bg-particles span:nth-child(2){ width:180px; height:180px; background:rgba(167,139,250,.14); top:65%; left:70%; animation-duration:24s; animation-delay:-6s; }
+.quiz-hero .hero-bg-particles span:nth-child(3){ width:90px; height:90px; background:rgba(244,114,182,.12); top:25%; left:78%; animation-duration:20s; animation-delay:-3s; }
+@keyframes float-particle{
+  0%{transform: translateY(0) translateX(0) scale(1)}
+  50%{transform: translateY(-40px) translateX(24px) scale(1.06)}
+  100%{transform: translateY(0) translateX(0) scale(1)}
+}
 
-  /* TEXT UTILS */
-  .muted{ color: #6b7280; font-size:.92rem; }
-  @media (prefers-color-scheme: dark){ .muted{ color:#98a2b3; } }
+/* Head block parity with index */
+.head{ position:relative; z-index:1; }
+.eyebrow{
+  font-size:.8rem; letter-spacing:.16em; text-transform:uppercase;
+  color: var(--muted);
+}
+h2.page-title{
+  margin:.25rem 0 .25rem; font-weight:800; line-height:1.15;
+  color: var(--ink);
+}
+.kicker{ color: var(--muted); }
 
-  /* TOOLBAR / BADGES */
-  .toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-  .pill {
-    color:black;
-    display:inline-flex; align-items:center; gap:8px;
-    padding:6px 12px; border-radius:999px; font-weight:600;
-    background: rgba(255,255,255,.14); color:#fff;
-  }
-  .pill .dot{ width:8px; height:8px;color:black; border-radius:999px; background:#10b981; }
+/* ---------- “Glass” card to match site ---------- */
+.glass{
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.35);
+  box-shadow: 0 10px 28px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  .glass{ border-color: rgba(255,255,255,.08); }
+}
 
-  /* INPUTS & BUTTONS */
-  .search-xl { height: 54px; font-size: 1.05rem; border-radius: 14px; }
-  .btn-clean {
-    border: 1px solid rgba(0,0,0,.12);
-    background: #ffffff; color:#111827; font-weight:600; border-radius:12px;
-    padding:.6rem 1.2rem; transition: all .18s ease; box-shadow: 0 4px 10px rgba(0,0,0,.05);
-  }
-  .btn-clean:hover{ background:#f9fafb; border-color:rgba(0,0,0,.18); box-shadow: 0 6px 14px rgba(0,0,0,.08); }
-  @media (prefers-color-scheme: dark){
-    .btn-clean{
-      background: rgba(255,255,255,.08); color:#e8eaed; border:1px solid rgba(255,255,255,.12);
-    }
-    .btn-clean:hover{ background: rgba(255,255,255,.12); }
-  }
+/* ---------- Toolbar / pill (neutral, low-color) ---------- */
+.toolbar{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.pill{
+  display:inline-flex; align-items:center; gap:.45rem; padding:.45rem .8rem;
+  border-radius:999px; font-weight:700; font-size:.9rem;
+  color: var(--ink); background:#fff; border:1px solid var(--line);
+}
+@media (prefers-color-scheme: dark){
+  .pill{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+.pill .dot{
+  width:8px; height:8px; border-radius:999px; background:#0f172a;
+}
+@media (prefers-color-scheme: dark){ .pill .dot{ background:#e5e7eb; } }
 
-  /* QUESTION CARD */
-  .q-card{
-    border:1px solid rgba(0,0,0,.06);
-    border-radius:16px;
-    background: rgba(255,255,255,.65);
-    padding:16px 16px 12px;
-    transition: box-shadow .18s ease, transform .12s ease;
-  }
-  .q-card:hover{ transform: translateY(-1px); box-shadow: 0 16px 28px rgba(0,0,0,.08); }
-  @media (prefers-color-scheme: dark){
-    .q-card{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
-  }
+/* ---------- Question card ---------- */
+.q-card{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background: var(--panel);
+  padding:16px 16px 12px;
+  transition: box-shadow .18s ease, transform .12s ease, border-color .18s ease;
+}
+.q-card:hover{ transform: translateY(-1px); box-shadow: 0 16px 28px rgba(0,0,0,.08); }
+.q-head{ display:flex; gap:12px; align-items:flex-start; justify-content:space-between; }
+.q-badge{
+  min-width:32px; height:32px; border-radius:10px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:800; background: #fff; color: var(--ink); border:1px solid var(--line);
+}
+@media (prefers-color-scheme: dark){
+  .q-badge{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+.q-title{ margin:0; font-weight:800; font-size:1rem; line-height:1.35; color:var(--ink); }
+.muted{ color: var(--muted); }
 
-  .q-head { display:flex; gap:12px; align-items:flex-start; justify-content:space-between; }
-  .q-badge{
-    min-width:32px; height:32px; border-radius:10px;
-    display:inline-flex; align-items:center; justify-content:center;
-    font-weight:800; background: rgba(0,0,0,.06); color:#111827;
-  }
-  @media (prefers-color-scheme: dark){
-    .q-badge{ background: rgba(255,255,255,.10); color:#e8eaed; }
-  }
-  .q-title{ margin:0; font-weight:700; font-size:1rem; line-height:1.35; }
+/* ---------- Choices (neutral, index-like) ---------- */
+.choice{
+  display:flex; gap:10px; align-items:center;
+  border:1px solid var(--line);
+  border-radius:12px; padding:10px 12px; cursor:pointer; user-select:none;
+  background:#fff; transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
+}
+.choice:hover{ background:#f8fafc; transform: translateY(-1px); }
+@media (prefers-color-scheme: dark){
+  .choice{ background:#0f172a; border-color:#1f2937; }
+  .choice:hover{ background:#111827; }
+}
+.choice .bullet{
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid #cbd5e1; display:inline-block; flex:0 0 18px;
+}
+@media (prefers-color-scheme: dark){ .choice .bullet{ border-color:#475569; } }
 
-  /* CHOICES */
-  .choice{
-    display:flex; gap:10px; align-items:center;
-    border:1px solid rgba(0,0,0,.10);
-    border-radius:12px; padding:10px 12px; cursor:pointer; user-select:none;
-    background: rgba(255,255,255,.85);
-    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
-  }
-  .choice:hover{ background:#ffffff; transform: translateY(-1px); }
-  @media (prefers-color-scheme: dark){
-    .choice{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.12); }
-    .choice:hover{ background: rgba(255,255,255,.12); }
-  }
-  .choice .bullet{
-    width:18px; height:18px; border-radius:50%;
-    border:2px solid rgba(0,0,0,.25);
-    display:inline-block; flex:0 0 18px;
-  }
-  @media (prefers-color-scheme: dark){ .choice .bullet{ border-color: rgba(255,255,255,.35); } }
+.choice.correct{ border-color:#10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.18) inset; }
+.choice.correct .bullet{ border-color:#10b981; background:#10b981; }
+.choice.wrong{ border-color:#ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.14) inset; }
+.choice.disabled{ opacity:.75; cursor:default; }
 
-  .choice.correct{
-    border-color:#10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.22) inset;
-  }
-  .choice.correct .bullet{ border-color:#10b981; background:#10b981; }
-  .choice.wrong{
-    border-color:#ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.16) inset;
-  }
-  .choice.disabled{ opacity:.75; cursor:default; }
+/* ---------- Explanation ---------- */
+.explain{
+  display:none; border-radius:12px; padding:10px 12px; margin-top:10px;
+  background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.22);
+  color: var(--ink);
+}
+.explain.bad{ background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.22); }
 
-  /* EXPLANATION */
-  .explain{
-    display:none; border-radius:12px; padding:10px 12px; margin-top:10px;
-    background: rgba(16,185,129,.10); border: 1px solid rgba(16,185,129,.25);
-  }
-  .explain.bad{ background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.25); }
+/* ---------- Empty state ---------- */
+.empty{
+  padding:28px; border-radius:16px; background: #fff; border:1px dashed var(--line);
+  color: var(--muted);
+}
+@media (prefers-color-scheme: dark){
+  .empty{ background:#0f172a; border-color:#334155; }
+}
+  .loader {
+  display:flex; align-items:center; gap:.6rem;
+  padding:14px; border:1px dashed var(--line); border-radius:12px;
+  background:#fff; color:var(--muted);
+}
+@media (prefers-color-scheme: dark){
+  .loader{ background:#0f172a; border-color:#334155; }
+}
+.loader .spinner{
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid #cbd5e1; border-top-color: transparent;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin{ to { transform: rotate(360deg); } }
+/* ---- Quiz progress ---- */
+.q-progress {
+  display:flex; flex-direction:column; gap:6px; min-width:260px;
+}
+.q-progress .track {
+  position:relative; height:10px; border-radius:999px; overflow:hidden;
+  background: #f1f5f9; border:1px solid var(--line);
+}
+@media (prefers-color-scheme: dark){
+  .q-progress .track{ background:#0f172a; }
+}
+.q-progress .bar {
+  height:100%; width:0%;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  transition: width .25s ease;
+}
+.q-progress .meta {
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:.85rem; color: var(--muted);
+}
+.q-progress .meta strong { color: var(--ink); }
 
-  /* EMPTY STATE */
-  .empty{
-    padding:28px; border-radius:16px;
-    background: rgba(0,0,0,.03); border:1px dashed rgba(0,0,0,.10);
-  }
-  @media (prefers-color-scheme: dark){
-    .empty{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
-  }
 </style>
 {% endblock %}
-
-
 {% block content %}
-<section class="container my-3">
-  <div class="quiz-hero glass">
-    <div class="d-flex flex-wrap align-items-center justify-content-between">
-      <div>
-        <h3 class="mb-1">Quiz • EPICHECK</h3>
-<!--        <div class="muted">Evidence-based MCQs grounded in WHO/CDC/NIH/MedlinePlus sources.</div>-->
-      </div>
-      <div class="toolbar">
-        <span class="pill"><span class="dot"></span> <span style="color:black;">Points: </span><strong id="pointCounter">{{ points or 0 }}</strong></span>
-      </div>
-    </div>
+<section class="container my-3 ">
+  <div class="quiz-hero">
+    <div class="hero-bg-particles"><span></span><span></span><span></span></div>
 
+    <div class="head">
+      <div class="eyebrow">Quiz</div>
+      <div class="d-flex flex-wrap align-items-center justify-content-between">
+        <h2 class="page-title mb-0">Practice smarter, learn faster</h2>
+        <div class="toolbar">
+          <span class="pill"><span class="dot"></span> Points: <strong id="pointCounter">{{ points or 0 }}</strong></span>
+
+          <!-- Progress -->
+          <div class="q-progress" aria-live="polite">
+            <div class="meta">
+              <span id="progressLabel">0/0 answered</span>
+              <span id="progressPct"><strong>0%</strong></span>
+            </div>
+            <div class="track" aria-hidden="true">
+              <div class="bar" id="progressBar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="kicker mb-0">Evidence-informed multiple choice questions with instant explanations.</p>
+    </div>
   </div>
 </section>
 
-<section class="container my-3">
-  {% if items and items|length > 0 %}
-    <div class="row g-3">
-      {% for it in items %}
-      <div class="col-12">
-        <div class="q-card glass" data-idx="{{ loop.index0 }}">
-          <div class="q-head">
-            <div class="d-flex align-items-start gap-2">
-              <span class="q-badge">{{ loop.index }}</span>
-              <h6 class="q-title"> {{ it.q }} </h6>
-            </div>
-            <div class="muted text-end small">
-              Source: <a href="{{ it.source }}" target="_blank" rel="noopener">{{ it.source }}</a>
-            </div>
-          </div>
-
-          <div class="row g-2 mt-2">
-            {% for ch in it.choices %}
-            <div class="col-12 col-md-6">
-              <div class="choice" data-choice="{{ loop.index0 }}">
-                <span class="bullet"></span>
-                <span>{{ ch }}</span>
+<!-- Keep ONE quiz section only -->
+<section class="container my-3 mb-5">
+  <div id="quizContainer">
+    {% if items and items|length > 0 %}
+      <div class="row g-3" id="itemsRoot">
+        {# server-rendered items (when a quiz already exists) #}
+        {% for it in items %}
+        <div class="col-12">
+          <div class="q-card" data-idx="{{ loop.index0 }}">
+            <div class="q-head">
+              <div class="d-flex align-items-start gap-2">
+                <span class="q-badge">{{ loop.index }}</span>
+                <h6 class="q-title">{{ it.q }}</h6>
+              </div>
+              <div class="muted text-end small">
+                Source: <a href="{{ it.source }}" target="_blank" rel="noopener">{{ it.source }}</a>
               </div>
             </div>
-            {% endfor %}
+            <div class="row g-2 mt-2">
+              {% for ch in it.choices %}
+              <div class="col-12 col-md-6">
+                <div class="choice" data-choice="{{ loop.index0 }}">
+                  <span class="bullet"></span>
+                  <span>{{ ch }}</span>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="explain mt-2 small" id="explain-{{ loop.index0 }}"></div>
           </div>
-
-          <div class="explain mt-2 small" id="explain-{{ loop.index0 }}"></div>
         </div>
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
-  {% elif topic %}
-    <div class="glass empty">
-      <div class="mb-2"><strong>No quiz items generated.</strong></div>
-      <div class="muted">Try a more specific topic or run Monitor first to collect better citations.</div>
-    </div>
-  {% else %}
-    <div class="glass empty">
-      <div class="muted">Enter a topic above to generate evidence-based questions.</div>
-    </div>
-  {% endif %}
+    {% elif topic %}
+      {# async path: show loader first, then hydrate via JS #}
+      <div class="loader" id="quizLoader" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        Generating your quiz…
+      </div>
+      <div class="row g-3 d-none" id="itemsRoot"></div>
+    {% else %}
+      <div class="empty">
+        <div>Enter a topic above to generate evidence-based questions.</div>
+      </div>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}
 
+
 {% block extra_scripts %}
 <script>
-  // Answer handler with correct-index reveal
-  document.querySelectorAll('.q-card .choice').forEach(el => {
+// Answer handler with correct-index reveal
+document.querySelectorAll('.q-card .choice').forEach(el => {
+  el.addEventListener('click', async () => {
+    const card = el.closest('.q-card');
+    const idx = Number(card.dataset.idx);
+    const choice = Number(el.dataset.choice);
+    if (card.dataset.done === "1") return;
+
+    try {
+      const resp = await fetch("{{ url_for('quiz_answer') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ idx, choice })
+      });
+      const data = await resp.json();
+      if (!data.ok) return;
+
+      // lock
+      card.dataset.done = "1";
+      card.querySelectorAll('.choice').forEach(c => c.classList.add('disabled'));
+
+      // mark
+      if (data.correct) {
+        el.classList.add('correct');
+      } else {
+        el.classList.add('wrong');
+        const all = [...card.querySelectorAll('.choice')];
+        const correctEl = all[data.answer_idx];
+        if (correctEl) correctEl.classList.add('correct');
+      }
+
+      // explanation
+      const ex = card.querySelector('#explain-'+idx);
+      if (ex) {
+        ex.style.display = 'block';
+        ex.classList.toggle('bad', !data.correct);
+        ex.innerHTML = `${data.correct ? "Correct." : "Not quite."} ${data.explain}
+          <br><a class="small" href="${data.source}" target="_blank" rel="noopener">Read source</a>`;
+      }
+
+      // points
+      const pc = document.getElementById('pointCounter');
+      if (pc) pc.textContent = data.points;
+
+      // progress
+      updateProgressUI();
+
+    } catch(e){ /* no-op */ }
+  });
+});
+</script>
+
+<script>
+// ---- helper to render one question card from JSON ----
+function renderCard(it, idx) {
+  const choices = it.choices || [];
+  const col = document.createElement('div');
+  col.className = 'col-12';
+  col.innerHTML = `
+    <div class="q-card" data-idx="${idx}">
+      <div class="q-head">
+        <div class="d-flex align-items-start gap-2">
+          <span class="q-badge">${idx + 1}</span>
+          <h6 class="q-title">${it.q}</h6>
+        </div>
+        <div class="muted text-end small">
+          Source: <a href="${it.source}" target="_blank" rel="noopener">${it.source}</a>
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        ${choices.map((ch, i) => `
+          <div class="col-12 col-md-6">
+            <div class="choice" data-choice="${i}">
+              <span class="bullet"></span>
+              <span>${ch}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="explain mt-2 small" id="explain-${idx}"></div>
+    </div>`;
+  return col;
+}
+
+// ---- attach handlers to a card ----
+function wireCard(card) {
+  card.querySelectorAll('.choice').forEach(el => {
     el.addEventListener('click', async () => {
-      const card = el.closest('.q-card');
-      const idx = Number(card.dataset.idx);
+      const c = el.closest('.q-card'); if (!c || c.dataset.done === "1") return;
+      const idx = Number(c.dataset.idx);
       const choice = Number(el.dataset.choice);
-
-      if (card.dataset.done === "1") return;
-
       try {
         const resp = await fetch("{{ url_for('quiz_answer') }}", {
           method: "POST",
@@ -227,23 +364,22 @@
         const data = await resp.json();
         if (!data.ok) return;
 
-        // disable further clicks
-        card.dataset.done = "1";
-        card.querySelectorAll('.choice').forEach(c => c.classList.add('disabled'));
+        // lock
+        c.dataset.done = "1";
+        c.querySelectorAll('.choice').forEach(x => x.classList.add('disabled'));
 
-        // mark chosen
+        // mark
         if (data.correct) {
           el.classList.add('correct');
         } else {
           el.classList.add('wrong');
-          // highlight correct one
-          const all = [...card.querySelectorAll('.choice')];
+          const all = [...c.querySelectorAll('.choice')];
           const correctEl = all[data.answer_idx];
           if (correctEl) correctEl.classList.add('correct');
         }
 
         // explanation
-        const ex = card.querySelector('#explain-'+idx);
+        const ex = c.querySelector('#explain-'+idx);
         if (ex) {
           ex.style.display = 'block';
           ex.classList.toggle('bad', !data.correct);
@@ -255,8 +391,205 @@
         const pc = document.getElementById('pointCounter');
         if (pc) pc.textContent = data.points;
 
-      } catch(e){ /* no-op */ }
+        // progress
+        updateProgressUI();
+
+      } catch(_) {}
     });
   });
+}
+
+// ---- async generation bootstrap ----
+(async function boot() {
+  const topic = "{{ (topic or '')|e }}";
+  const hasItems = {{ 'true' if items and items|length > 0 else 'false' }};
+  if (!topic || hasItems) return;
+
+  const loader = document.getElementById('quizLoader');
+  const root = document.getElementById('itemsRoot');
+
+  try {
+    const resp = await fetch("{{ url_for('api_quiz_generate') }}", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ topic })
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'failed');
+
+    // render cards
+    root.classList.remove('d-none');
+    root.innerHTML = ''; // clear
+    data.items.forEach((it, i) => {
+      const col = renderCard(it, i);
+      root.appendChild(col);
+      wireCard(col.querySelector('.q-card'));
+    });
+
+    // points
+    const pc = document.getElementById('pointCounter');
+    if (pc) pc.textContent = data.points;
+
+    // progress
+    updateProgressUI();
+
+  } catch (e) {
+    if (loader) loader.innerHTML = "Couldn’t generate quiz right now. Please try again.";
+  } finally {
+    loader?.remove();
+  }
+})();
 </script>
+
+<script>
+// Simple HTML escape
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// Render one card (escaped) – this overrides the earlier renderCard (intended)
+function renderCard(it, idx) {
+  const choices = it.choices || [];
+  const col = document.createElement('div');
+  col.className = 'col-12';
+  col.innerHTML = `
+    <div class="q-card" data-idx="${idx}">
+      <div class="q-head">
+        <div class="d-flex align-items-start gap-2">
+          <span class="q-badge">${idx + 1}</span>
+          <h6 class="q-title">${esc(it.q)}</h6>
+        </div>
+        <div class="muted text-end small">
+          Source: <a href="${esc(it.source)}" target="_blank" rel="noopener">${esc(it.source)}</a>
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        ${choices.map((ch, i) => `
+          <div class="col-12 col-md-6">
+            <div class="choice" data-choice="${i}">
+              <span class="bullet"></span>
+              <span>${esc(ch)}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="explain mt-2 small" id="explain-${idx}"></div>
+    </div>`;
+  return col;
+}
+</script>
+
+<script>
+(async function bootDaily() {
+  const hasItems = {{ 'true' if items and items|length > 0 else 'false' }};
+  const initialProgress = {{ progress_json|safe if progress_json is defined else '{}' }};
+
+  // If items already rendered (server path), apply saved progress immediately:
+  if (hasItems && Object.keys(initialProgress).length > 0) {
+    applyProgress(initialProgress);
+    updateProgressUI(); // ensure bar matches restored answers
+    return;
+  }
+
+  // Otherwise show loader and hydrate
+  const loader = document.getElementById('quizLoader');
+  const root = document.getElementById('itemsRoot');
+
+  try {
+    const resp = await fetch("{{ url_for('api_quiz_daily') }}", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"}
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'failed');
+
+    // render cards
+    root.classList.remove('d-none');
+    root.innerHTML = '';
+    data.items.forEach((it, i) => {
+      const col = renderCard(it, i);
+      root.appendChild(col);
+      wireCard(col.querySelector('.q-card'));
+    });
+
+    // topic/points
+    const pc = document.getElementById('pointCounter');
+    if (pc) pc.textContent = data.points;
+
+    // apply saved progress
+    if (data.progress) applyProgress(data.progress);
+
+    // progress (after rendering + progress application)
+    updateProgressUI();
+
+  } catch(e) {
+    if (loader) loader.innerHTML = "Couldn’t load today’s quiz. Please try again.";
+  } finally {
+    loader?.remove();
+  }
+})();
+
+// Mark answered questions (resume)
+function applyProgress(progress) {
+  Object.entries(progress).forEach(([idxStr, info]) => {
+    const idx = Number(idxStr);
+    const c = document.querySelector(`.q-card[data-idx="${idx}"]`);
+    if (!c) return;
+    const selected = Number(info.selected_idx);
+    const correct = !!info.correct;
+    const answerIdx = typeof info.answer_idx === 'number' ? info.answer_idx : null;
+
+    // lock the card
+    c.dataset.done = "1";
+    c.querySelectorAll('.choice').forEach(x => x.classList.add('disabled'));
+
+    // style selected + reveal correct (when known)
+    const choices = [...c.querySelectorAll('.choice')];
+    const selEl = choices[selected];
+    if (selEl) selEl.classList.add(correct ? 'correct' : 'wrong');
+    if (!correct && answerIdx != null) {
+      const correctEl = choices[answerIdx];
+      if (correctEl) correctEl.classList.add('correct');
+    }
+
+    // explanation
+    const ex = c.querySelector('#explain-'+idx);
+    if (ex) {
+      ex.style.display = 'block';
+      ex.classList.toggle('bad', !correct);
+      if (!ex.innerHTML.trim()) {
+        ex.innerHTML = correct ? "Already answered correctly." : "Already answered.";
+      }
+    }
+  });
+
+  // ensure bar reflects restored answers
+  updateProgressUI();
+}
+</script>
+
+<script>
+function updateProgressUI() {
+  const total = document.querySelectorAll('.q-card').length || 0;
+  const answered = document.querySelectorAll('.q-card[data-done="1"]').length || 0;
+
+  const pct = total ? Math.round((answered / total) * 100) : 0;
+  const bar = document.getElementById('progressBar');
+  const label = document.getElementById('progressLabel');
+  const pctEl = document.getElementById('progressPct');
+
+  if (bar)   bar.style.width = pct + '%';
+  if (label) label.textContent = `${answered}/${total} answered`;
+  if (pctEl) pctEl.innerHTML = `<strong>${pct}%</strong>`;
+}
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => updateProgressUI());
+</script>
+
 {% endblock %}

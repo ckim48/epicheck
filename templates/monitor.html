@@ -5,265 +5,205 @@
 {% block extra_head %}
 <style>
   :root{
-    --glass: rgba(255,255,255,.7);
+    --glass: rgba(255,255,255,.70);
     --glass-dark: rgba(23,25,35,.65);
     --blur: blur(12px);
-    --ring: rgba(99,102,241,.35);
-    --surface: #0e1014;
-    --text-weak: #6b7280;
+    --surface: #0b0f19;
   }
   @media (prefers-color-scheme: dark){
-    :root { --glass: rgba(33,37,41,.5); --ring: rgba(99,102,241,.35); }
-    body{ background: #0b0d12; color: #e8eaed; }
+    :root { --glass: rgba(20,22,30,.55); }
+    body{ background: #0b0f19; color: #e5e7eb; }
   }
 
-  /* Background */
+  /* ===== Background (subtle, like index) ===== */
   body {
     min-height: 100vh;
-    background:
-      radial-gradient(1200px 600px at -10% -10%, #c7e1ff 0, transparent 60%),
-      radial-gradient(900px 500px at 110% 10%, #ffd6ef 0, transparent 60%),
-      radial-gradient(1000px 600px at 50% 120%, #dcffe1 0, transparent 60%), #f7f8fc;
+    background: #fff;
   }
   @media (prefers-color-scheme: dark){
-    body {
-      background:
-        radial-gradient(1200px 600px at -10% -10%, #0d1930 0, transparent 60%),
-        radial-gradient(900px 500px at 110% 10%, #2a1025 0, transparent 60%),
-        radial-gradient(1000px 600px at 50% 120%, #0f2a15 0, transparent 60%), var(--surface);
-    }
+    body { background: var(--surface); }
   }
 
-  /* Glass card */
+  /* ===== Reused index button styles (neutral) ===== */
+  .btn-plain{ background:#111; color:#fff; border:1px solid #111; border-radius:10px; font-weight:700; }
+  .btn-plain:hover{ background:#000; border-color:#000; color:#fff; }
+  .btn-outline-plain{ background:transparent; color:#111; border:1px solid #d1d5db; border-radius:10px; font-weight:700; }
+  .btn-outline-plain:hover{ background:#f8f9fb; border-color:#cbd5e1; color:#111; }
+  @media (prefers-color-scheme: dark){
+    .btn-plain{ background:#e5e7eb; color:#0b0f19; border-color:#e5e7eb; }
+    .btn-plain:hover{ background:#fff; border-color:#fff; color:#0b0f19; }
+    .btn-outline-plain{ color:#e5e7eb; border-color:#374151; }
+    .btn-outline-plain:hover{ background:#111827; border-color:#4b5563; color:#e5e7eb; }
+  }
+
+  /* ===== Shared section header (matches index) ===== */
+  .section-head{ text-align:center; max-width:880px; margin:0 auto 16px; }
+  .section-head .eyebrow{
+    font-size:.78rem; letter-spacing:.16em; text-transform:uppercase; color:#94a3b8;
+  }
+  @media (prefers-color-scheme: dark){ .section-head .eyebrow{ color:#64748b; } }
+  .section-head h2{
+    font-weight:800; line-height:1.15; margin:8px 0 10px;
+  }
+  .section-head .kicker{ color:#64748b; max-width:64ch; margin:0 auto; }
+  @media (prefers-color-scheme: dark){ .section-head .kicker{ color:#94a3b8; } }
+
+  /* ===== Glass card shell ===== */
   .glass {
     background: var(--glass);
     backdrop-filter: var(--blur);
     -webkit-backdrop-filter: var(--blur);
-    border: 1px solid rgba(255,255,255,0.35);
+    border: 1px solid rgba(255,255,255,0.28);
     border-radius: 18px;
-    box-shadow: 0 10px 28px rgba(0,0,0,.08);
+    box-shadow: 0 10px 28px rgba(0,0,0,.06);
   }
   @media (prefers-color-scheme: dark){
-    .glass { background: var(--glass-dark); border-color: rgba(255,255,255,.08); }
+    .glass { background: var(--glass-dark); border-color: rgba(255,255,255,.08); box-shadow:none; }
   }
 
-  /* Header band */
-  .hero {
-    border-radius: 20px;
-    padding: 28px;
-    color: #fff;
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg,#111827, #1f2937);
-  }
-  .hero::after{
-    content:""; position:absolute; inset:-2px;
-    background: radial-gradient(650px 150px at 10% -20%, rgba(99,102,241,.35), transparent 40%),
-                radial-gradient(650px 150px at 90% 120%, rgba(16,185,129,.35), transparent 40%);
-    pointer-events:none;
-  }
-
-  /* Sticky action bar */
+  /* ===== Sticky action bar ===== */
   .action-bar { position: sticky; top: 12px; z-index: 20; border-radius: 18px; }
-
-  /* Inputs */
   .search-xl { height: 56px; font-size: 1.05rem; border-radius: 14px; }
+
+  /* Segmented controls (match index neutrals) */
   .segmented {
-    display:inline-flex; gap:6px; padding:6px; border-radius:999px;
-    background: rgba(0,0,0,.06);
+    display:inline-flex; gap:6px; padding:6px; border-radius:999px; background: rgba(0,0,0,.06);
   }
-  .segmented .seg { border-radius:999px; padding:8px 14px; border:0; font-weight:600; }
+  .segmented .seg { border-radius:999px; padding:8px 14px; border:0; font-weight:700; }
   .segmented .seg.active { background:#111827; color:#fff; }
   @media (prefers-color-scheme: dark){
     .segmented { background: rgba(255,255,255,.08); }
-    .segmented .seg { color:#e8eaed; background: transparent; border:1px solid rgba(255,255,255,.14); }
-    .segmented .seg.active { background:#e8eaed; color:#111827; border-color:transparent; }
+    .segmented .seg { color:#e5e7eb; background: transparent; border:1px solid #374151; }
+    .segmented .seg.active { background:#e5e7eb; color:#111827; border-color:transparent; }
   }
 
-  /* Post card */
+  /* ===== Post card ===== */
   .post-card {
     transition: transform .16s ease, box-shadow .16s ease, border-color .2s ease;
-    border: 1px solid rgba(255,255,255,.35);
+    border: 1px solid rgba(0,0,0,.06);
+    background:#fff;
+    border-radius:14px;
   }
-  .post-card:hover { transform: translateY(-2px); box-shadow: 0 18px 40px rgba(0,0,0,.10); }
+  .post-card:hover { transform: translateY(-2px); box-shadow: 0 18px 40px rgba(0,0,0,.08); }
+  @media (prefers-color-scheme: dark){
+    .post-card{ border-color:#1f2937; background:#0f172a; }
+  }
   .tiny{font-size:.9rem}
   .post-body{white-space:pre-wrap}
-  .chip {
-    display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem;
-    background: rgba(0,0,0,0.08);
+  .chip{
+    display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem; background: rgba(0,0,0,.06);
   }
   @media (prefers-color-scheme: dark){ .chip { background: rgba(255,255,255,.08); } }
 
-  /* Section headers */
-  .section-tag { border-top-left-radius:18px; border-top-right-radius:18px; padding: 14px 16px; font-weight:700; }
+  /* Column section tags (muted, low color like index) */
+  .section-tag { border-top-left-radius:18px; border-top-right-radius:18px; padding: 12px 16px; font-weight:800; background:#f8fafc; border-bottom:1px solid #e5e7eb; }
+  @media (prefers-color-scheme: dark){ .section-tag{ background:#0f172a; border-bottom-color:#1f2937; } }
+  .valid-bg *{ color:#065f46 !important; }
+  .uncertain-bg *{ color:#92400e !important; }
+  .invalid-bg *{ color:#7f1d1d !important; }
 
-  /* Verdict colors */
-  .valid-bg { background: rgba(16,185,129,.18); }
-  .uncertain-bg { background: rgba(245,158,11,.18); }
-  .invalid-bg { background: rgba(239,68,68,.18); }
-
-  /* Confidence bar */
+  /* Confidence bar (unchanged) */
   .conf { --w: 0%; height: 8px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,.08); }
   .conf > i { display:block; height: 100%; width: var(--w); background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981); }
   @media (prefers-color-scheme: dark){ .conf { background: rgba(255,255,255,.12); } }
 
+  /* Badges */
+  .yt-badge { background: #ff0000 !important; }
+  .rd-badge { background: #ff4500 !important; }
+
+  /* ===== Modal — neutral & consistent with index ===== */
+  .modal-backdrop.show { backdrop-filter: blur(6px); background: rgba(10,12,18,.45); }
+  .modal-content.glass {
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.75);
+    backdrop-filter: blur(10px);
+  }
+  @media (prefers-color-scheme: dark){
+    .modal-content.glass{ background: rgba(20,22,30,.75); border-color: rgba(255,255,255,.08); }
+  }
+
+  .modal-hero {
+    position: relative; padding: 22px 22px 18px; color: #e5e7eb;
+    background: linear-gradient(135deg,#111827, #1f2937);
+  }
+  .modal-hero h5 { margin: 0; font-weight: 800; letter-spacing: .2px; }
+  .modal-hero p  { margin: 6px 0 0; opacity: .9; }
+
+  .icon-chip {
+    display:inline-flex; align-items:center; justify-content:center;
+    width: 40px; height: 40px; border-radius: 12px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.18);
+    margin-right: 10px;
+  }
+
+  .modal-body.modern { padding: 18px 20px 6px; }
+  .step-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0,1fr)); }
+  @media (max-width: 768px){ .step-grid{ grid-template-columns: 1fr; } }
+
+  .step {
+    border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px 14px; background:#fff;
+    display: flex; gap: 10px; align-items: start; transition: transform .15s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .step:hover{ transform: translateY(-1px); box-shadow: 0 12px 24px rgba(0,0,0,.07); }
+  @media (prefers-color-scheme: dark){
+    .step{ background:#0f172a; border-color:#1f2937; }
+  }
+  .step i { font-size: 1.1rem; margin-top: 1px; }
+  .step h6 { margin: 0; font-weight: 800; font-size: .98rem; }
+  .step p  { margin: 4px 0 0; opacity: .85; font-size: .92rem; }
+
+  .tips { margin-top: 10px; display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 768px){ .tips{ grid-template-columns: 1fr; } }
+  .card-min { border-radius: 14px; border: 1px dashed #e5e7eb; background:#fafafa; padding: 12px 14px; }
+  @media (prefers-color-scheme: dark){ .card-min{ border-color:#374151; background:#0f172a; } }
+
+  .kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.85rem; padding:2px 8px; border-radius:8px;
+    border:1px solid #e5e7eb; background:#fff; box-shadow: inset 0 -1px 0 rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark){ .kbd{ background:#111827; border-color:#374151; } }
+
+  .modal-footer.modern { border-top: 1px solid #e5e7eb; padding: 14px 18px 18px; }
+  @media (prefers-color-scheme: dark){ .modal-footer.modern{ border-color:#1f2937; } }
+
   /* Loading overlay */
   #loadingOverlay {
-    position: fixed; inset: 0; background: rgba(15,18,23,.6);
+    position: fixed; inset: 0; background: rgba(15,18,23,.55);
     display: none; align-items: center; justify-content: center; z-index: 9999;
     backdrop-filter: blur(4px);
   }
-  .spinner {
-    width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35);
-    border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite;
-    box-shadow: 0 0 0 6px var(--ring);
-  }
+  .spinner { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Platform badges */
-  .yt-badge { background: #ff0000 !important; }
-  .rd-badge { background: #ff4500 !important; }
-  .action-bar {
-  position: relative;
-}
-  /* ==== Modern Modal – Glass + Gradient + Blur Backdrop ==== */
-.modal-backdrop.show { backdrop-filter: blur(6px); background: rgba(10,12,18,.45); }
-
-.modal-content.glass {
-  border-radius: 20px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: linear-gradient(180deg, rgba(255,255,255,.70), rgba(255,255,255,.55));
-  box-shadow: 0 30px 80px rgba(0,0,0,.25);
-  overflow: hidden;
-}
-@media (prefers-color-scheme: dark){
-  .modal-content.glass{
-    background: linear-gradient(180deg, rgba(30,34,44,.80), rgba(20,23,30,.70));
-    border-color: rgba(255,255,255,.08);
-  }
-}
-
-/* Hero band inside modal */
-.modal-hero {
-  position: relative;
-  padding: 28px 28px 22px;
-  color: #fff;
-  background: linear-gradient(135deg,#111827 0%, #1f2937 50%, #0b5 120%);
-  overflow: hidden;
-}
-.modal-hero::after{
-  content:"";
-  position:absolute; inset:-30%;
-  background:
-    radial-gradient(500px 160px at 10% -10%, rgba(99,102,241,.45), transparent 55%),
-    radial-gradient(500px 160px at 90% 120%, rgba(16,185,129,.45), transparent 55%);
-  pointer-events:none;
-}
-.modal-hero h5 { margin: 0; font-weight: 800; letter-spacing: .2px; }
-.modal-hero p  { margin: 6px 0 0; opacity: .9; }
-
-/* Icon chip */
-.icon-chip {
-  display:inline-flex; align-items:center; justify-content:center;
-  width: 42px; height: 42px; border-radius: 12px;
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.35);
-  margin-right: 10px;
-}
-
-/* Body content */
-.modal-body.modern { padding: 20px 22px 6px; }
-.step-grid {
-  display: grid; gap: 12px;
-  grid-template-columns: repeat(2, minmax(0,1fr));
-}
-@media (max-width: 768px){ .step-grid{ grid-template-columns: 1fr; } }
-
-.step {
-  border: 1px solid rgba(0,0,0,.06);
-  border-radius: 14px;
-  padding: 12px 12px 12px 14px;
-  background: rgba(255,255,255,.6);
-  display: flex; gap: 10px; align-items: start;
-  transition: transform .15s ease, border-color .2s ease, box-shadow .2s ease;
-}
-.step:hover{ transform: translateY(-1px); box-shadow: 0 12px 24px rgba(0,0,0,.07); }
-@media (prefers-color-scheme: dark){
-  .step{
-    background: rgba(255,255,255,.06);
-    border-color: rgba(255,255,255,.10);
-  }
-}
-
-.step i { font-size: 1.1rem; margin-top: 1px; }
-.step h6 { margin: 0; font-weight: 700; font-size: .98rem; }
-.step p  { margin: 4px 0 0; opacity: .8; font-size: .92rem; }
-
-/* Shortcut + tips row */
-.tips {
-  margin-top: 10px;
-  display: grid; gap: 12px;
-  grid-template-columns: 1fr 1fr;
-}
-@media (max-width: 768px){ .tips{ grid-template-columns: 1fr; } }
-
-.card-min {
-  border-radius: 14px;
-  border: 1px dashed rgba(0,0,0,.10);
-  background: rgba(0,0,0,.03);
-  padding: 12px 14px;
-}
-@media (prefers-color-scheme: dark){
-  .card-min{
-    border-color: rgba(255,255,255,.14);
-    background: rgba(255,255,255,.05);
-  }
-}
-
-.kbd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: .85rem;
-  padding: 2px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(0,0,0,.18);
-  background: rgba(255,255,255,.8);
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,.08);
-  margin-right: 6px;
-}
-@media (prefers-color-scheme: dark){
-  .kbd{ background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.18); }
-}
-
-/* Footer CTA */
-.modal-footer.modern {
-  border-top: 1px solid rgba(0,0,0,.06);
-  padding: 14px 18px 18px;
-}
-@media (prefers-color-scheme: dark){
-  .modal-footer.modern{ border-color: rgba(255,255,255,.08); }
-}
-.btn-gradient {
-  border: 0; color: #fff; font-weight: 700;
-  background: #787878;
-  box-shadow: 0 8px 24px rgba(16,185,129,.25);
-}
-.btn-gradient:hover{ filter: brightness(.98); }
-
 </style>
 {% endblock %}
 
 {% block content %}
 
+  <!-- Header -->
+  <section class="container mt-4">
+    <div class="section-head">
+      <div class="eyebrow">Monitor</div>
+      <h2>Scan social posts and verify health claims</h2>
+      <p class="kicker">Search YouTube & Reddit, classify results, view confidence, and open citations quickly.</p>
+    </div>
+  </section>
+
   <!-- Sticky action bar -->
   <section class="container my-3">
     <div class="glass action-bar p-3 p-md-4">
       <button type="button"
-              class="btn btn-light rounded-circle shadow-sm position-absolute bottom-0 end-0 m-3"
+              class="btn btn-outline-plain rounded-circle position-absolute bottom-0 end-0 m-3"
               data-bs-toggle="modal"
               data-bs-target="#instructionModal"
               aria-label="Instructions">
         <i class="bi bi-question-lg"></i>
       </button>
+  {% set all_posts = (results.valid or []) + (results.uncertain or []) + (results.invalid or []) %}
+{% set yt_count = all_posts | selectattr('platform', 'equalto', 'YouTube') | list | length %}
+{% set rd_count = all_posts | selectattr('platform', 'equalto', 'Reddit')  | list | length %}
+{% set total_count = all_posts | length %}
 
       <form id="searchForm" method="post" class="row g-3 align-items-center">
         <div class="col-12 col-lg-6">
@@ -286,12 +226,12 @@
         </div>
 
         <div class="col-12 col-lg-2 d-grid">
-          <button id="searchBtn" class="btn btn-dark btn-lg">
+          <button id="searchBtn" class="btn btn-plain btn-lg">
             <i class="bi bi-rocket-takeoff me-1"></i> Search
           </button>
         </div>
 
-        <!-- Verdict quick filter (client-side) -->
+        <!-- Verdict quick filter -->
         <div class="col-12">
           <div class="d-flex flex-wrap gap-2 align-items-center">
             <span class="text-muted tiny">Filter:</span>
@@ -302,11 +242,12 @@
               <button type="button" class="seg" data-v="invalid"><i class="bi bi-x-circle me-1"></i>Invalid</button>
             </div>
 
-            {% if sources_used %}
-              <div class="ms-auto tiny text-muted">
-                <i class="bi bi-clock-history me-1"></i> {{ ", ".join(sources_used) }} • {{ now }}
-              </div>
-            {% endif %}
+          {% if sources_used %}
+            <div class="ms-auto tiny text-muted">
+              <span class="ms-2">{{ yt_count }} YouTube • {{ rd_count }} Reddit • {{ total_count }} total</span>
+            </div>
+          {% endif %}
+
           </div>
         </div>
       </form>
@@ -319,13 +260,13 @@
       <div class="col-12 col-lg-4 verdict-col" data-v="valid">
         <div class="glass h-100">
           <div class="section-tag valid-bg">
-            <span class="text-success"><i class="bi bi-check2-circle me-1"></i>Valid</span>
+            <span><i class="bi bi-check2-circle me-1"></i>Valid</span>
           </div>
           <div class="p-3">
             {% if results.valid %}
               {% for p in results.valid %}
               {% set pct = ((p.credibility_score or 0) * 100) | round(0, 'floor') %}
-              <article class="post-card glass p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="valid">
+              <article class="post-card p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="valid">
                 <div class="d-flex justify-content-between tiny mb-1">
                   <span>
                     {% if p.platform == 'YouTube' %}
@@ -351,7 +292,7 @@
 
                 <div class="tiny mb-2">
                   <div class="d-flex justify-content-between">
-                    <span class="text-success">Verdict: Valid</span>
+                    <span>Verdict: Valid</span>
                     <span>{{ pct|int }}%</span>
                   </div>
                   <div class="conf"><i style="--w: {{ pct|int }}%"></i></div>
@@ -381,13 +322,13 @@
       <div class="col-12 col-lg-4 verdict-col" data-v="uncertain">
         <div class="glass h-100">
           <div class="section-tag uncertain-bg">
-            <span class="text-warning"><i class="bi bi-question-circle me-1"></i>Uncertain</span>
+            <span><i class="bi bi-question-circle me-1"></i>Uncertain</span>
           </div>
           <div class="p-3">
             {% if results.uncertain %}
               {% for p in results.uncertain %}
               {% set pct = ((p.credibility_score or 0) * 100) | round(0, 'floor') %}
-              <article class="post-card glass p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="uncertain">
+              <article class="post-card p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="uncertain">
                 <div class="d-flex justify-content-between tiny mb-1">
                   <span>
                     {% if p.platform == 'YouTube' %}
@@ -443,13 +384,13 @@
       <div class="col-12 col-lg-4 verdict-col" data-v="invalid">
         <div class="glass h-100">
           <div class="section-tag invalid-bg">
-            <span class="text-danger"><i class="bi bi-x-circle me-1"></i>Fake / Invalid</span>
+            <span><i class="bi bi-x-circle me-1"></i>Invalid</span>
           </div>
           <div class="p-3">
             {% if results.invalid %}
               {% for p in results.invalid %}
               {% set pct = ((p.credibility_score or 0) * 100) | round(0, 'floor') %}
-              <article class="post-card glass p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="invalid">
+              <article class="post-card p-3 mb-3" data-platform="{{ p.platform|lower }}" data-verdict="invalid">
                 <div class="d-flex justify-content-between tiny mb-1">
                   <span>
                     {% if p.platform == 'YouTube' %}
@@ -475,7 +416,7 @@
 
                 <div class="tiny mb-2">
                   <div class="d-flex justify-content-between">
-                    <span class="text-danger">Verdict: Invalid</span>
+                    <span>Verdict: Invalid</span>
                     <span>{{ pct|int }}%</span>
                   </div>
                   <div class="conf"><i style="--w: {{ pct|int }}%"></i></div>
@@ -495,19 +436,19 @@
               </article>
               {% endfor %}
             {% else %}
-              <p class="text-muted mb-0">No fake/invalid posts for this query.</p>
+              <p class="text-muted mb-0">No invalid posts for this query.</p>
             {% endif %}
           </div>
         </div>
       </div>
     </div>
   </main>
-<!-- Instruction Modal -->
+
+<!-- ===== Instruction Modal (neutral) ===== -->
 <div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content glass">
 
-      <!-- HERO -->
       <div class="modal-hero">
         <div class="d-flex align-items-center">
           <span class="icon-chip"><i class="bi bi-magic"></i></span>
@@ -518,14 +459,13 @@
         </div>
       </div>
 
-      <!-- BODY -->
       <div class="modal-body modern">
         <div class="step-grid">
           <div class="step">
             <i class="bi bi-type"></i>
             <div>
               <h6>1) Enter Keywords</h6>
-              <p>Try specific phrases like <em>“garlic for weight loss”</em> or <em>“detox tea”</em>.</p>
+              <p>Try phrases like <em>“garlic for weight loss”</em> or <em>“detox tea”</em>.</p>
             </div>
           </div>
 
@@ -549,7 +489,7 @@
             <i class="bi bi-filter-circle"></i>
             <div>
               <h6>4) Filter by Verdict</h6>
-              <p>Switch between <strong>Valid</strong>, <strong>Uncertain</strong>, or <strong>Invalid</strong> instantly.</p>
+              <p>Switch between <strong>Valid</strong>, <strong>Uncertain</strong>, or <strong>Invalid</strong>.</p>
             </div>
           </div>
         </div>
@@ -558,9 +498,9 @@
           <div class="card-min">
             <div class="fw-bold mb-2"><i class="bi bi-lightning-charge me-1"></i> Power Tips</div>
             <ul class="mb-0 small ps-3">
-              <li>Click a card’s citations to open sources in a new tab.</li>
-              <li>Confidence bar reflects the credibility score; hover cards for emphasis.</li>
-              <li>Toggling sources with keywords auto-runs a fresh search.</li>
+              <li>Open citations from any card to view sources.</li>
+              <li>Confidence bar reflects the credibility score.</li>
+              <li>Toggle sources to quickly refine visible posts.</li>
             </ul>
           </div>
 
@@ -577,16 +517,11 @@
         </div>
       </div>
 
-      <!-- FOOTER -->
       <div class="modal-footer modern d-flex justify-content-between">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          Close
+        <button type="button" class="btn btn-outline-plain" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-plain" data-bs-dismiss="modal" id="startSearch">
+          Start searching
         </button>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-gradient" data-bs-dismiss="modal" id="startSearch">
-            Start searching
-          </button>
-        </div>
       </div>
 
     </div>
@@ -594,9 +529,7 @@
 </div>
 
   <!-- Loading overlay -->
-  <div id="loadingOverlay">
-    <div class="spinner"></div>
-  </div>
+  <div id="loadingOverlay"><div class="spinner"></div></div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -623,29 +556,71 @@
     });
   }
 
-  // Client-side verdict filter (no re-fetch)
+  // Client-side verdict filter
   const verdictSeg = document.getElementById('verdictSeg');
   if (verdictSeg) {
     verdictSeg.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg');
-      if (!btn) return;
-      verdictSeg.querySelectorAll('.seg').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const v = btn.dataset.v; // all | valid | uncertain | invalid
+      const b = e.target.closest('.seg'); if (!b) return;
+      verdictSeg.querySelectorAll('.seg').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const v = b.dataset.v; // all | valid | uncertain | invalid
       document.querySelectorAll('.verdict-col').forEach(col => {
-        if (v === 'all') { col.style.display = ''; }
-        else { col.style.display = (col.dataset.v === v) ? '' : 'none'; }
+        col.style.display = (v === 'all' || col.dataset.v === v) ? '' : 'none';
       });
     });
   }
 
-  // Auto-submit when toggling sources (if there are keywords)
+  // Platform pill filter (no network call)
+  function applyPlatformFilter() {
+    const showYT = document.getElementById('src_yt')?.checked;
+    const showRD = document.getElementById('src_rd')?.checked;
+    document.querySelectorAll('.post-card').forEach(card => {
+      const p = (card.dataset.platform || '').toLowerCase();
+      const visible =
+        (p === 'youtube' && showYT) ||
+        (p === 'reddit' && showRD) ||
+        (p !== 'youtube' && p !== 'reddit');
+      card.style.display = visible ? '' : 'none';
+    });
+  }
+  document.addEventListener('DOMContentLoaded', applyPlatformFilter);
   document.querySelectorAll('input[name="sources"]').forEach(chk => {
     chk.addEventListener('change', () => {
-      const kw = document.querySelector('input[name="keywords"]').value.trim();
-      if (kw) document.getElementById('searchForm').requestSubmit();
+      const lab = document.querySelector(`label[for="${chk.id}"]`);
+      if (lab) lab.classList.toggle('active', chk.checked);
+      applyPlatformFilter();
     });
   });
+
+  // Modal CTA -> focus search field
+  const startBtn = document.getElementById('startSearch');
+  if (startBtn) startBtn.addEventListener('click', () => {
+    document.querySelector('input[name="keywords"]')?.focus();
+  });
 </script>
+<script>
+document.addEventListener('keydown', function(e) {
+  const verdictSeg = document.getElementById('verdictSeg');
+  if (!verdictSeg) return;
+
+  // Focus search when pressing "/"
+  if (e.key === '/') {
+    e.preventDefault();
+    document.querySelector('input[name="keywords"]')?.focus();
+    return;
+  }
+
+  // Switch verdict filter with 1/2/3
+  if (e.key === '1') {
+    verdictSeg.querySelector('[data-v="valid"]')?.click();
+  }
+  if (e.key === '2') {
+    verdictSeg.querySelector('[data-v="uncertain"]')?.click();
+  }
+  if (e.key === '3') {
+    verdictSeg.querySelector('[data-v="invalid"]')?.click();
+  }
+});
+</script>
+
 {% endblock %}

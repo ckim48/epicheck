@@ -1,0 +1,132 @@
+{% extends "nav.html" %}
+{% block title %}New Campaign • EPICHECK{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ---- Tokens aligned with index ---- */
+:root{
+  --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --panel:#ffffff; --glass:rgba(255,255,255,.70);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --ink:#e5e7eb; --muted:#94a3b8; --line:#1f2937; --panel:#0b0f19; --glass:rgba(23,25,35,.65); }
+}
+
+/* ---- Hero (neutral + soft particles) ---- */
+.page-hero{
+  position:relative; border-radius:20px; padding:24px;
+  background:var(--panel); border:1px solid var(--line);
+  box-shadow:0 10px 28px rgba(0,0,0,.06); overflow:hidden;
+}
+.page-hero .bg-particles{ position:absolute; inset:0; pointer-events:none; }
+.page-hero .bg-particles span{
+  position:absolute; display:block; border-radius:50%; opacity:.7; filter:blur(6px);
+  animation:float linear infinite;
+}
+.page-hero .bg-particles span:nth-child(1){ width:120px;height:120px;background:rgba(96,165,250,.16); top:8%; left:10%; animation-duration:18s; }
+.page-hero .bg-particles span:nth-child(2){ width:160px;height:160px;background:rgba(167,139,250,.14); top:60%; left:75%; animation-duration:24s; animation-delay:-6s; }
+.page-hero .bg-particles span:nth-child(3){ width:90px;height:90px;background:rgba(244,114,182,.12); top:22%; left:82%; animation-duration:20s; animation-delay:-3s; }
+@keyframes float{ 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(24px,-36px) scale(1.06)} 100%{transform:translate(0,0) scale(1)} }
+
+.head .eyebrow{ font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.head .title{ margin:.2rem 0 .2rem; font-weight:800; line-height:1.15; color:var(--ink); }
+.head .kicker{ color:var(--muted); }
+
+/* ---- Glass card ---- */
+.glass{
+  background:var(--glass); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border-radius:16px; border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 10px 24px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){ .glass{ border-color:rgba(255,255,255,.08); } }
+
+/* ---- Inputs ---- */
+.form-control, .form-select{
+  border-radius:12px; border:1px solid var(--line); padding:.75rem .9rem; background:#fff; color:var(--ink);
+}
+.form-control:focus, .form-select:focus{
+  outline:none; border-color:#cbd5e1; box-shadow:0 0 0 4px rgba(148,163,184,.22);
+}
+@media (prefers-color-scheme: dark){
+  .form-control, .form-select{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .form-control:focus, .form-select:focus{ border-color:#334155; box-shadow:0 0 0 4px rgba(51,65,85,.32); }
+}
+.form-label{ font-size:.9rem; color:var(--muted); }
+
+/* ---- Buttons (low-color primary + link) ---- */
+.btn-clean{
+  border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:700;
+  border-radius:10px; padding:.65rem 1.1rem; transition:background .18s,border-color .18s,box-shadow .18s;
+}
+.btn-clean:hover{ background:#f8fafc; border-color:#cbd5e1; box-shadow:0 6px 14px rgba(0,0,0,.06); }
+@media (prefers-color-scheme: dark){
+  .btn-clean{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .btn-clean:hover{ background:#111827; border-color:#334155; }
+}
+
+/* subtle helper text */
+.form-text{ color:var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container my-3">
+  <div class="page-hero">
+    <div class="bg-particles"><span></span><span></span><span></span></div>
+    <div class="head position-relative">
+      <div class="eyebrow">Campaigns</div>
+      <h2 class="title mb-1">Create Campaign</h2>
+      <p class="kicker mb-0">Plan a weekly myth-busting series with quizzes, prompts, and shareable posts.</p>
+    </div>
+  </div>
+</section>
+
+<section class="container my-3">
+  <div class="glass p-3 p-md-4">
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+    <form method="post" class="mt-1">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Title</label>
+          <input name="title" class="form-control" placeholder="e.g., Healthy Hype Busters" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Topic</label>
+          <input name="topic" class="form-control" placeholder="e.g., detox, cold plunge, apple cider vinegar" required>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Audience</label>
+          <select name="audience" class="form-select">
+            <option value="school_club">School Club</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Visibility</label>
+          <select name="visibility" class="form-select">
+            <option value="public">Public (shareable)</option>
+            <option value="private">Private</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Weeks</label>
+          <input name="weeks" type="number" min="1" max="12" value="4" class="form-control">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Start (YYYY-MM-DD)</label>
+          <input name="starts_on" type="date" class="form-control" value="{{ today }}">
+          <div class="form-text">Leave empty for next Monday (app time zone).</div>
+        </div>
+
+        <div class="col-12 d-flex gap-2 mt-2">
+          <button class="btn btn-clean"><i class="bi bi-magic me-1"></i> Generate Plan</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

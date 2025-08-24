@@ -1,0 +1,304 @@
+{% extends "nav.html" %}
+{% block title %}Campaign • {{ campaign.title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ---- Tokens aligned with index ---- */
+:root{
+  --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --panel:#ffffff; --glass:rgba(255,255,255,.70);
+  --ink-strong:#0b1220;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#e5e7eb; --muted:#94a3b8; --line:#1f2937; --panel:#0b0f19; --glass:rgba(23,25,35,.65);
+    --ink-strong:#e7eaee;
+  }
+}
+
+/* ---- Hero (neutral + soft particles) ---- */
+.page-hero{
+  position:relative; border-radius:20px; padding:24px;
+  background:var(--panel); border:1px solid var(--line);
+  box-shadow:0 10px 28px rgba(0,0,0,.06); overflow:hidden;
+}
+.page-hero .bg-particles{ position:absolute; inset:0; pointer-events:none; }
+.page-hero .bg-particles span{
+  position:absolute; display:block; border-radius:50%; opacity:.7; filter:blur(6px);
+  animation:float linear infinite;
+}
+.page-hero .bg-particles span:nth-child(1){ width:120px;height:120px;background:rgba(96,165,250,.16); top:8%; left:10%; animation-duration:18s; }
+.page-hero .bg-particles span:nth-child(2){ width:160px;height:160px;background:rgba(167,139,250,.14); top:64%; left:75%; animation-duration:24s; animation-delay:-6s; }
+.page-hero .bg-particles span:nth-child(3){ width:90px;height:90px;background:rgba(244,114,182,.12); top:22%; left:82%; animation-duration:20s; animation-delay:-3s; }
+@keyframes float{ 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(24px,-36px) scale(1.06)} 100%{transform:translate(0,0) scale(1)} }
+
+.head .eyebrow{ font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.head .title{ margin:.2rem 0 .2rem; font-weight:800; line-height:1.15; color:var(--ink-strong); }
+.head .kicker{ color:var(--muted); }
+
+/* ---- Chips / labels ---- */
+.meta{ color:var(--muted); }
+.type-chip{
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+  border:1px solid var(--line); border-radius:999px; padding:.22rem .55rem; color:var(--muted); background:#fff;
+}
+.type-chip i{ font-size:.85em; }
+@media (prefers-color-scheme: dark){
+  .type-chip{ background:#0f172a; border-color:#1f2937; color:#cbd5e1; }
+}
+
+/* ---- Section wrapper ---- */
+.glass{
+  background:var(--glass); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border-radius:16px; border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 10px 24px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){ .glass{ border-color:rgba(255,255,255,.08); } }
+
+.week-head{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:12px 14px; border-bottom:1px solid var(--line);
+}
+.week-title{ margin:0; font-weight:900; font-size:1.05rem; color:var(--ink-strong); }
+
+/* ---- Poster card ---- */
+.poster-card{
+  display:flex; flex-direction:column; gap:10px;
+  background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px;
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  height:100%;
+}
+.poster-card:hover{ transform:translateY(-2px); box-shadow:0 16px 28px rgba(0,0,0,.08); }
+@media (prefers-color-scheme: dark){
+  .poster-card{ background:#0f172a; border-color:#1f2937; }
+}
+
+/* Header row inside poster */
+.poster-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.poster-title{ margin:0; font-weight:800; color:var(--ink-strong); line-height:1.2; }
+
+/* Actions */
+.poster-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.btn-clean{
+  border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:700;
+  border-radius:10px; padding:.45rem .8rem; transition:background .18s,border-color .18s,box-shadow .18s;
+}
+.btn-clean:hover{ background:#f8fafc; border-color:#cbd5e1; box-shadow:0 6px 14px rgba(0,0,0,.06); }
+@media (prefers-color-scheme: dark){
+  .btn-clean{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .btn-clean:hover{ background:#111827; border-color:#334155; }
+}
+
+/* Body rendered from md-lite */
+.poster-body{ color:var(--ink); }
+@media (prefers-color-scheme: dark){ .poster-body{ color:#e5e7eb; } }
+
+/* Simple typographic system for sections */
+.poster-body h2{ font-size:1.1rem; font-weight:900; margin:10px 0 6px; }
+.poster-body h3{ font-size:.98rem; font-weight:800; margin:10px 0 6px; color:var(--ink-strong); }
+.poster-body ul{ padding-left:1.1rem; margin:.25rem 0 .5rem; }
+.poster-body li{ margin:.18rem 0; }
+.poster-body .pill{
+  display:inline-flex; align-items:center; gap:.4rem; padding:.2rem .55rem; border-radius:999px;
+  background:rgba(99,102,241,.12);
+  border:1px solid rgba(99,102,241,.22); font-weight:700; font-size:.76rem;
+}
+.poster-body .note{
+  margin-top:.35rem; padding:.55rem .65rem; border-radius:10px;
+  background:rgba(234,179,8,.10); border:1px solid rgba(234,179,8,.25);
+}
+
+/* Sources list */
+.sources{
+  margin-top:.4rem; border-top:1px dashed var(--line); padding-top:.45rem; color:var(--muted);
+}
+.sources .label{ font-weight:800; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; }
+
+/* Collapsible */
+.collapsed .poster-body{ max-height: 200px; overflow: hidden; position: relative; }
+.collapsed .poster-body::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:64px;
+  background:linear-gradient(180deg, rgba(255,255,255,0), var(--panel));
+}
+@media (prefers-color-scheme: dark){
+  .collapsed .poster-body::after{
+    background:linear-gradient(180deg, rgba(15,23,42,0), #0f172a);
+  }
+}
+.poster-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap:12px;
+}
+@media (min-width: 480px){
+  .poster-grid{ grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
+/* Minor utilities */
+.smallcaps{ font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .poster-card.wide{
+  padding:20px 18px;
+}
+.poster-title.xl{
+  font-size:1.15rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container my-3">
+  <div class="page-hero">
+    <div class="bg-particles"><span></span><span></span><span></span></div>
+    <div class="head position-relative">
+      <div class="eyebrow">Campaign</div>
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h2 class="title mb-0">{{ campaign.title }}</h2>
+        <div class="d-flex align-items-center gap-2">
+          {% if campaign.visibility == 'public' %}
+            <a class="btn btn-clean btn-sm" target="_blank"
+               href="{{ url_for('campaigns_public', slug=campaign.slug) }}">
+               <i class="bi bi-box-arrow-up-right me-1"></i> Public Page
+            </a>
+          {% else %}
+            <span class="type-chip"><i class="bi bi-lock-fill"></i> Private</span>
+          {% endif %}
+        </div>
+      </div>
+      <p class="kicker mb-0 meta">
+        Topic: <strong>{{ campaign.topic }}</strong> • Audience: {{ campaign.audience.replace('_',' ').title() }} •
+        Starts: {{ campaign.starts_on }} • Weeks: {{ campaign.weeks }}
+      </p>
+    </div>
+  </div>
+</section>
+<section class="container my-3">
+  {% for w, items in weeks.items() %}
+    {% set posters = items | selectattr('content_type','equalto','poster') | list %}
+    {% set poster = posters|first %}
+
+    {% if poster %}
+    <div class="glass p-0 mb-3">
+      <div class="week-head">
+        <h3 class="week-title">Week {{ w }}</h3>
+        <span class="smallcaps">Poster</span>
+      </div>
+
+      <div class="p-3">
+        <div class="poster-card wide collapsed" data-collapsible>
+          <div class="poster-head">
+            <div class="d-flex align-items-center gap-2">
+              <span class="type-chip"><i class="bi bi-postcard-heart"></i> Poster</span>
+              <h5 class="poster-title xl">{{ poster.title }}</h5>
+            </div>
+            <div class="poster-actions">
+              <button class="btn-clean btn-sm" data-copy title="Copy poster text">
+                <i class="bi bi-clipboard"></i> Copy
+              </button>
+              <button class="btn-clean btn-sm" data-toggle title="Expand / collapse">
+                <i class="bi bi-arrows-expand"></i> Expand
+              </button>
+            </div>
+          </div>
+
+          <div class="poster-body" data-raw="{{ poster.body|e }}"></div>
+
+          {% if poster.sources and poster.sources|length %}
+            <div class="sources small">
+              <div class="label mb-1">Credible Resources</div>
+              {% for u in poster.sources %}
+                <div>• <a href="{{ u }}" target="_blank" rel="noreferrer">{{ u }}</a></div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+</section>
+
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* --------- Minimal md-lite to style poster bodies ---------
+   Supports: ## / ### headings, -, * bullets, 1. 2. lists, **bold**, _italic_
+   Keeps it safe by escaping the original and replacing known patterns only.
+------------------------------------------------------------ */
+(function(){
+  function esc(s){return s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));}
+  function mdLite(src){
+    let s = esc(src || "").trim();
+
+    // Headings
+    s = s.replace(/^###\s?(.*)$/gm, '<h3>$1</h3>');
+    s = s.replace(/^##\s?(.*)$/gm, '<h2>$1</h2>');
+
+    // Bold / italic
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/_(.+?)_/g, '<em>$1</em>');
+
+    // Lists: numbered
+    s = s.replace(/^(?:\s*\d+\.\s.*(?:\n|$))+?/gm, function(block){
+      const items = block.trim().split(/\n+/).map(l=>l.replace(/^\s*\d+\.\s?/, '').trim()).filter(Boolean);
+      return '<ol><li>' + items.join('</li><li>') + '</li></ol>';
+    });
+
+    // Lists: bullets (- or •)
+    s = s.replace(/^(?:\s*(?:-|•)\s.*(?:\n|$))+?/gm, function(block){
+      const items = block.trim().split(/\n+/).map(l=>l.replace(/^\s*(?:-|•)\s?/, '').trim()).filter(Boolean);
+      return '<ul><li>' + items.join('</li><li>') + '</li></ul>';
+    });
+
+    // Pills: “Poster — …” line becomes a pill
+    s = s.replace(/^##\s?Poster\s—?\s?(.*)$/mi, '<h2><span class="pill">$1</span></h2>');
+
+    // Notes (Teen Takeaway)
+    s = s.replace(/^###\s?Teen Takeaway\s*$/mi, '<h3>Teen Takeaway</h3>');
+
+    // Paragraphs (fallback)
+    s = s.replace(/^(?!<h2>|<h3>|<ul>|<ol>)([^\n][^\n]*)$/gm, '<p>$1</p>');
+    return s;
+  }
+
+  document.querySelectorAll('.poster-body').forEach(el=>{
+    const raw = el.getAttribute('data-raw') || '';
+    el.innerHTML = mdLite(raw);
+  });
+
+  // Copy + Expand handlers
+  document.querySelectorAll('[data-collapsible]').forEach(card=>{
+    const body = card.querySelector('.poster-body');
+    const btnCopy = card.querySelector('[data-copy]');
+    const btnToggle = card.querySelector('[data-toggle]');
+
+    // start collapsed
+    card.classList.add('collapsed');
+
+    btnToggle?.addEventListener('click', ()=>{
+      card.classList.toggle('collapsed');
+      const icon = btnToggle.querySelector('i');
+      if(icon){ icon.className = card.classList.contains('collapsed') ? 'bi bi-arrows-expand' : 'bi bi-arrows-collapse'; }
+      btnToggle.blur();
+    });
+
+    btnCopy?.addEventListener('click', async ()=>{
+      try{
+        // copy plain text version
+        const temp = document.createElement('div');
+        temp.innerHTML = body.innerHTML;
+        const txt = temp.innerText.replace(/\n{3,}/g, '\n\n').trim();
+        await navigator.clipboard.writeText(txt);
+        btnCopy.innerHTML = '<i class="bi bi-check2"></i> Copied';
+        setTimeout(()=>btnCopy.innerHTML = '<i class="bi bi-clipboard"></i> Copy', 1200);
+      }catch(_e){
+        btnCopy.innerHTML = '<i class="bi bi-clipboard-x"></i> Failed';
+        setTimeout(()=>btnCopy.innerHTML = '<i class="bi bi-clipboard"></i> Copy', 1200);
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}
