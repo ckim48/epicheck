@@ -1,0 +1,143 @@
+<!-- templates/studio/new.html -->
+{% extends "nav.html" %}
+{% block title %}New Poster Campaign{% endblock %}
+{% block content %}
+
+<style>
+/* =========================
+   Light Theme Tokens (shared)
+========================= */
+:root{
+  --surface:      #f8fafc;   /* page background */
+  --card:         #ffffff;   /* form card */
+  --card-border:  #e3e8ef;
+  --ink:          #1e293b;   /* main text */
+  --muted:        #64748b;   /* secondary text */
+
+  /* accents */
+  --accent:       #4f46e5;   /* indigo */
+  --accent-2:     #818cf8;
+
+  /* semantic */
+  --danger:       #ef4444;
+  --danger-2:     #fecaca;
+}
+
+/* Page background (if base doesn't set it) */
+body{ background: var(--surface); color: var(--ink); }
+
+/* Container card */
+.form-wrap{
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 .25rem .75rem rgba(0,0,0,.06);
+}
+@media (min-width: 768px){
+  .form-wrap{ padding: 1.75rem; }
+}
+
+/* Heading and helper */
+.page-title{ margin-bottom: .25rem; font-weight: 700; }
+.page-sub{ color: var(--muted); margin-bottom: 1rem; }
+
+/* Inputs / selects */
+.form-label{ font-weight: 600; color: var(--ink); }
+.form-control, .form-select{
+  background-color: #fff;
+  border: 1px solid var(--card-border);
+  color: var(--ink);
+  border-radius: .6rem;
+  padding: .55rem .75rem;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.form-control::placeholder{ color: color-mix(in srgb, var(--muted) 65%, #fff); }
+.form-control:focus, .form-select:focus{
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent-2) 25%, transparent);
+  outline: none;
+}
+
+/* Create button (no Bootstrap colors) */
+.btn-create{
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; border: 0; border-radius: .8rem;
+  padding: .65rem 1.1rem; font-weight: 700;
+  display: inline-flex; align-items: center; gap: .5rem;
+  text-decoration: none;
+  transition: transform .15s ease, filter .15s ease;
+}
+.btn-create:hover{ transform: translateY(-2px); filter: brightness(1.05); }
+.btn-create:active{ transform: translateY(0); }
+
+/* Error note (replaces .alert-danger) */
+.note-error{
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--card-border));
+  color: var(--danger);
+  border-radius: .75rem;
+  padding: .6rem .8rem;
+}
+
+/* Small helper text under inputs (optional) */
+.help{ color: var(--muted); font-size: .875rem; margin-top: .25rem; }
+</style>
+
+<div class="container my-4">
+  <h2 class="h4 page-title">Create Poster Campaign</h2>
+  <p class="page-sub">Define the basics. You can add posters and schedule content after creating the campaign.</p>
+
+  <div class="form-wrap">
+    {% if error %}<div class="note-error mb-3">{{ error }}</div>{% endif %}
+
+    <form method="post" class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Title</label>
+        <input name="title" class="form-control" placeholder="e.g., Myth-busting Mondays" required>
+        <div class="help">Clear and recognizable name for your campaign.</div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Topic</label>
+        <input name="topic" class="form-control" placeholder="e.g., Detox myths" required>
+        <div class="help">The main subject your posters will cover.</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Audience</label>
+        <select name="audience" class="form-select">
+          <option value="school_club">School club</option>
+          <option value="public">Public</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Visibility</label>
+        <select name="visibility" class="form-select">
+          <option value="public">Public</option>
+          <option value="private">Private</option>
+        </select>
+        <div class="help">Public campaigns are shareable by link.</div>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label">Weeks</label>
+        <input name="weeks" type="number" min="1" max="12" class="form-control" value="4">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label">Starts on (UTC)</label>
+        <input name="starts_on" type="date" class="form-control">
+      </div>
+
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn-create" type="submit">
+          <i class="bi bi-check2-circle"></i>
+          Create Campaign
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

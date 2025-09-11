@@ -185,11 +185,18 @@
               <i class="bi bi-person-badge me-1"></i> Profile
             </a>
           </li>
-                              <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('campaigns_index') }}">
-              <i class="bi bi-megaphone"></i> Campaigns
+          <li class="nav-item">
+            <a class="nav-link {{ 'active' if ep in [
+                  'studio.studio_home',
+                  'studio.studio_new',
+                  'studio.studio_view',
+                  'studio.studio_public'
+                ] else '' }}"
+               href="{{ url_for('studio.studio_home') }}">
+              <i class="bi bi-easel2"></i> Poster Studio
             </a>
           </li>
+
           <li class="nav-item">
             <a class="btn-monitor {{ 'is-active' if ep == 'monitor' else '' }}" href="{{ url_for('monitor') }}">
               <i class="bi bi-activity"></i><span class="d-none d-sm-inline">Search</span>

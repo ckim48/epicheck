@@ -1,28 +1,31 @@
-# app.py — single-file EPICHECK + Poster Studio
-
-import os, re, time, html, json, textwrap, sqlite3, base64, uuid, secrets, random, string
-from datetime import datetime, timezone, timedelta, date
+import os, re, time, html, json, textwrap, sqlite3
+from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
-
 import requests
 from flask import (
-    Flask, Blueprint, render_template, request, session, redirect,
-    url_for, g, jsonify, flash, abort
+    Flask, render_template, request, session, redirect, url_for, g, jsonify, flash
 )
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import secrets
+import random, string
 from zoneinfo import ZoneInfo
 
-# ========= Config =========
 APP_TZ = os.getenv("APP_TZ", "Asia/Seoul")
+
+
+# =========================
+# App & Config
+# =========================
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
 COMMON_HEADERS = {"User-Agent": "EPICHECK/1.0 (+https://example.edu)"}
-DB_PATH = os.getenv("EPICHECK_DB", os.path.join(os.path.dirname(__file__), "epicheck.db"))
 
+# SQLite file path (local)
+DB_PATH = os.getenv("EPICHECK_DB", os.path.join(os.path.dirname(__file__), "epicheck.db"))
 SUBTHEMES = [
     "basic facts & definitions", "common myths", "who should avoid",
     "possible side effects", "evidence quality", "interactions/contraindications",
@@ -37,6 +40,7 @@ SUBTHEMES = [
 ALLOWED_HEALTH_DOMAINS = (
     "who.int", "cdc.gov", "nih.gov", "medlineplus.gov", "ncbi.nlm.nih.gov"
 )
+
 QUIZ_SYSTEM = (
     "You are a quiz generator for youth health misinformation topics. "
     "Given a topic, return STRICT JSON: an array of exactly 10 objects. "
@@ -45,19 +49,21 @@ QUIZ_SYSTEM = (
     "Ground questions in WHO/CDC/NIH/MedlinePlus sources."
 )
 
-# Optional deps
+# Optional OpenAI (env var required)
 try:
     from openai import OpenAI
     _OPENAI_AVAILABLE = True
 except Exception:
     _OPENAI_AVAILABLE = False
 
+# feedparser for RSS fallback
 try:
     import feedparser
     _FEEDPARSER_AVAILABLE = True
 except Exception:
     _FEEDPARSER_AVAILABLE = False
 
+# YouTube transcripts (public/auto captions when available)
 try:
     from youtube_transcript_api import (
         YouTubeTranscriptApi,
@@ -70,20 +76,25 @@ except Exception:
     _YT_TRANSCRIPT_AVAILABLE = False
 
 
-# ========= Time helpers =========
+# =========================
+# Time helpers (UTC-aware)
+# =========================
 def _parse_iso_any(value):
     """Best-effort parse of ISO-ish strings to aware UTC datetime."""
     if isinstance(value, datetime):
         dt = value
     else:
         s = str(value or "").strip()
+        # handle ...Z
         try:
             dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         except Exception:
+            # fallback common format
             try:
                 dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
             except Exception:
                 return None
+    # normalize to aware UTC
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     else:
@@ -92,13 +103,14 @@ def _parse_iso_any(value):
 
 @app.template_filter("dt")
 def jinja_dt(value, fmt="%Y-%m-%d %H:%M"):
+
     dt = _parse_iso_any(value)
     if not dt:
         return "" if value in (None, "") else str(value)
     try:
         local = dt.astimezone(ZoneInfo(APP_TZ))
     except Exception:
-        local = dt
+        local = dt  # fallback
     return local.strftime(fmt)
 
 def now_utc():
@@ -118,7 +130,9 @@ def today_str():
     return now_utc().date().isoformat()
 
 
-# ========= DB helpers =========
+# =========================
+# DB helpers (SQLite)
+# =========================
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
@@ -135,14 +149,13 @@ def _col_exists(db, table, colname):
     rows = db.execute(f"PRAGMA table_info({table})").fetchall()
     names = {r["name"] for r in rows}
     return colname in names
-
 def init_db():
     db = get_db()
     db.executescript(
         """
         PRAGMA foreign_keys = ON;
 
-        -- Users / Monitoring
+        -- ===== Users / Monitoring (existing) =====
         CREATE TABLE IF NOT EXISTS users (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             name          TEXT,
@@ -150,7 +163,6 @@ def init_db():
             password_hash TEXT NOT NULL,
             created_at    TEXT NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
         CREATE TABLE IF NOT EXISTS searches (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -160,7 +172,6 @@ def init_db():
             user_id     INTEGER,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_searches_created_at ON searches(created_at);
 
         CREATE TABLE IF NOT EXISTS posts (
             id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,25 +189,30 @@ def init_db():
             transcript_excerpt  TEXT,
             FOREIGN KEY (search_id) REFERENCES searches(id) ON DELETE CASCADE
         );
-        CREATE INDEX IF NOT EXISTS idx_posts_search_id ON posts(search_id);
 
-        -- Quizzes
+        CREATE INDEX IF NOT EXISTS idx_users_email         ON users(email);
+        CREATE INDEX IF NOT EXISTS idx_posts_search_id     ON posts(search_id);
+        CREATE INDEX IF NOT EXISTS idx_searches_created_at ON searches(created_at);
+
+        -- ===== Quiz persistence =====
         CREATE TABLE IF NOT EXISTS quizzes (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             topic      TEXT NOT NULL,
-            is_daily   INTEGER NOT NULL DEFAULT 0,
+            is_daily   INTEGER NOT NULL DEFAULT 0,  -- 1 for daily quiz
             created_at TEXT NOT NULL
         );
+
+        -- Include 'topic' column for fresh installs
         CREATE TABLE IF NOT EXISTS quiz_items (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             quiz_id    INTEGER NOT NULL,
-            idx        INTEGER NOT NULL,
+            idx        INTEGER NOT NULL,            -- 0-based order
             q          TEXT NOT NULL,
-            choices    TEXT NOT NULL,
+            choices    TEXT NOT NULL,               -- JSON array of 4 strings
             answer_idx INTEGER NOT NULL,
             explain    TEXT,
             source     TEXT,
-            topic      TEXT,
+            topic      TEXT,                        -- per-item topic (may differ from quizzes.topic)
             FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_quiz_items_quiz ON quiz_items(quiz_id);
@@ -204,8 +220,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS quiz_attempts (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             quiz_id    INTEGER NOT NULL,
-            user_id    INTEGER,
-            anon_id    TEXT,
+            user_id    INTEGER,                     -- null for anonymous
+            anon_id    TEXT,                        -- per-session token for anonymous
             started_at TEXT NOT NULL,
             finished_at TEXT,
             score      INTEGER NOT NULL DEFAULT 0,
@@ -227,66 +243,42 @@ def init_db():
         );
         CREATE UNIQUE INDEX IF NOT EXISTS uq_answers_attempt_item ON quiz_answers(attempt_id, item_id);
 
-        -- Legacy Campaigns (keep if still used)
+        -- ===== Campaigns =====
         CREATE TABLE IF NOT EXISTS campaigns (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id    INTEGER NOT NULL,
             title      TEXT NOT NULL,
             topic      TEXT NOT NULL,
-            audience   TEXT NOT NULL,
-            visibility TEXT NOT NULL,
-            starts_on  TEXT NOT NULL,
+            audience   TEXT NOT NULL,          -- 'school_club' | 'public'
+            visibility TEXT NOT NULL,          -- 'private' | 'public'
+            starts_on  TEXT NOT NULL,          -- YYYY-MM-DD (UTC date string)
             weeks      INTEGER NOT NULL DEFAULT 4,
             created_at TEXT NOT NULL,
-            slug       TEXT NOT NULL UNIQUE,
+            slug       TEXT NOT NULL UNIQUE,   -- public-friendly id
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
         CREATE TABLE IF NOT EXISTS campaign_items (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             campaign_id  INTEGER NOT NULL,
-            week_no      INTEGER NOT NULL,
-            content_type TEXT NOT NULL,
+            week_no      INTEGER NOT NULL,     -- 1..N
+            content_type TEXT NOT NULL,        -- 'myth','quiz','prompt','poster','caption','newsletter'
             title        TEXT NOT NULL,
             body         TEXT NOT NULL,
-            sources      TEXT,
+            sources      TEXT,                 -- JSON array of URLs
             created_at   TEXT NOT NULL,
             FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_campaign_items_campaign ON campaign_items(campaign_id);
-
-        -- NEW: Poster Studio tables
-        CREATE TABLE IF NOT EXISTS poster_campaigns (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            title      TEXT NOT NULL,
-            topic      TEXT NOT NULL,
-            audience   TEXT NOT NULL,  -- 'school_club' | 'public'
-            visibility TEXT NOT NULL,  -- 'private' | 'public'
-            starts_on  TEXT NOT NULL,
-            weeks      INTEGER NOT NULL DEFAULT 4,
-            slug       TEXT NOT NULL UNIQUE,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS posters (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            campaign_id  INTEGER NOT NULL,
-            week_no      INTEGER NOT NULL,
-            prompt       TEXT NOT NULL,
-            img_path     TEXT NOT NULL,
-            seed         TEXT,
-            width        INTEGER NOT NULL,
-            height       INTEGER NOT NULL,
-            created_at   TEXT NOT NULL,
-            FOREIGN KEY (campaign_id) REFERENCES poster_campaigns(id) ON DELETE CASCADE
-        );
         """
     )
 
-    # Lightweight migrations/backfills
+    # ---------- Lightweight migrations ----------
+    # 1) Add user_id to searches (legacy DBs)
     if not _col_exists(db, "searches", "user_id"):
         db.execute("ALTER TABLE searches ADD COLUMN user_id INTEGER")
 
+    # 2) Ensure quiz_items.topic exists and is indexed; backfill from parent quiz
     if not _col_exists(db, "quiz_items", "topic"):
         db.execute("ALTER TABLE quiz_items ADD COLUMN topic TEXT")
         db.executescript("""
@@ -298,19 +290,82 @@ def init_db():
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_quiz_items_topic ON quiz_items(topic)")
 
-    # Ensure campaign slug index exists for legacy table
-    try:
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_campaigns_slug ON campaigns(slug)")
-    except Exception:
-        pass
+    # 3) Campaigns safety: create tables if missing (older installs)
+    #    and ensure 'slug' exists + unique.
+    #    If campaigns table exists but slug missing, add and populate.
+    if not _col_exists(db, "campaigns", "id"):
+        # Table entirely missing -> create both tables (no-op if they already exist)
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS campaigns (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL,
+                title      TEXT NOT NULL,
+                topic      TEXT NOT NULL,
+                audience   TEXT NOT NULL,
+                visibility TEXT NOT NULL,
+                starts_on  TEXT NOT NULL,
+                weeks      INTEGER NOT NULL DEFAULT 4,
+                created_at TEXT NOT NULL,
+                slug       TEXT NOT NULL UNIQUE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS campaign_items (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaign_id  INTEGER NOT NULL,
+                week_no      INTEGER NOT NULL,
+                content_type TEXT NOT NULL,
+                title        TEXT NOT NULL,
+                body         TEXT NOT NULL,
+                sources      TEXT,
+                created_at   TEXT NOT NULL,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_campaign_items_campaign ON campaign_items(campaign_id);
+        """)
+    else:
+        # Table exists: check for slug column
+        if not _col_exists(db, "campaigns", "slug"):
+            db.execute("ALTER TABLE campaigns ADD COLUMN slug TEXT")
+            # Backfill a simple unique slug per existing row
+            rows = db.execute("SELECT id FROM campaigns WHERE slug IS NULL OR slug = ''").fetchall()
+            import secrets, string
+            alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
+            def gen_slug(n=8):
+                return "".join(secrets.choice(alphabet) for _ in range(n))
+            for r in rows:
+                # ensure uniqueness
+                while True:
+                    s = gen_slug()
+                    exists = db.execute("SELECT 1 FROM campaigns WHERE slug = ?", (s,)).fetchone()
+                    if not exists:
+                        break
+                db.execute("UPDATE campaigns SET slug = ? WHERE id = ?", (s, r["id"]))
+            # enforce uniqueness (SQLite requires re-create for full constraint; index is fine here)
+            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_campaigns_slug ON campaigns(slug)")
+
+        # Ensure campaign_items table exists (older partial installs)
+        if not _col_exists(db, "campaign_items", "id"):
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS campaign_items (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    campaign_id  INTEGER NOT NULL,
+                    week_no      INTEGER NOT NULL,
+                    content_type TEXT NOT NULL,
+                    title        TEXT NOT NULL,
+                    body         TEXT NOT NULL,
+                    sources      TEXT,
+                    created_at   TEXT NOT NULL,
+                    FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_campaign_items_campaign ON campaign_items(campaign_id);
+            """)
 
     db.commit()
 
 with app.app_context():
     init_db()
 
-
-# ========= Auth & User =========
+# ---------- User helpers ----------
 def get_user_by_email(email: str):
     return get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
@@ -353,8 +408,11 @@ def login_required(fn):
     return wrapper
 
 
-# ========= Monitor persistence =========
+# =========================
+# Persistence for monitor
+# =========================
 def save_monitor_search(keywords: str, sources_used: list[str], user_id: int | None) -> int:
+    """Insert a new row in searches and return its ID."""
     db = get_db()
     db.execute(
         "INSERT INTO searches (keywords, sources, created_at, user_id) VALUES (?, ?, ?, ?)",
@@ -396,7 +454,9 @@ def save_monitor_posts(search_id: int, results: dict):
     db.commit()
 
 
-# ========= Utilities =========
+# =========================
+# Utilities
+# =========================
 def clean_html_to_text(html_str, limit=5000):
     soup = BeautifulSoup(html_str or "", "html.parser")
     for tag in soup(["script", "style", "noscript", "header", "footer", "aside", "nav"]):
@@ -420,6 +480,7 @@ def fetch_trusted_pages(urls, per_page_limit=5000, max_pages=3):
     return texts
 
 def _norm(s: str) -> str:
+    """Normalize a string to catch near-duplicates."""
     s = (s or "").lower()
     s = s.replace("’", "'").replace("“", '"').replace("”", '"')
     s = re.sub(r"\s+", " ", s)
@@ -427,6 +488,7 @@ def _norm(s: str) -> str:
     return s.strip()
 
 def ensure_unique_items(items: list[dict], topic: str) -> list[dict]:
+    """Drop near-duplicates by question+choices signature."""
     seen = set()
     out = []
     for it in items:
@@ -437,8 +499,10 @@ def ensure_unique_items(items: list[dict], topic: str) -> list[dict]:
             seen.add(sig)
             out.append(it)
     return out
-
 def get_attempt_progress(quiz_id: int, attempt_id: int) -> dict[int, dict]:
+    """
+    Returns { idx: {selected_idx:int, correct:bool, answer_idx:int} }
+    """
     db = get_db()
     rows = db.execute(
         """
@@ -455,12 +519,388 @@ def get_attempt_progress(quiz_id: int, attempt_id: int) -> dict[int, dict]:
         out[int(r["idx"])] = {
             "selected_idx": int(r["selected_idx"]),
             "correct": bool(r["correct"]),
-            "answer_idx": int(r["answer_idx"]),
+            "answer_idx": int(r["answer_idx"]),  # NEW
         }
     return out
 
+def get_or_create_todays_daily(display_topic: str, mix_topics: list[str]) -> int:
+    """
+    Idempotent “create if not exists” for today’s daily.
+    GPT-only generation (with a single broader retry).
+    """
+    quiz_id = get_daily_quiz_today_id()
+    if quiz_id:
+        return quiz_id
 
-# ========= Quiz generation helpers =========
+    # 1) Try GPT on the display topic (e.g., "term1, term2, term3")
+    items_gen = gpt_generate_mcqs(display_topic, n_questions=10)
+
+    # 2) If GPT returns <10 or empty, retry once with a broader composite prompt
+    if len(items_gen) < 10:
+        broader_topic = ", ".join(mix_topics)
+        more = gpt_generate_mcqs(broader_topic, n_questions=10)
+        items_gen = ensure_unique_items(items_gen + more, topic="__mixed__")
+
+    # 3) If still short, just persist what we have (UI will render however many arrive)
+    if not items_gen:
+        # Optional: give the user a friendly single item explaining we couldn’t generate today.
+        items_gen = [{
+            "q": f"Couldn’t generate the daily quiz right now. Try again later.",
+            "choices": ["OK", "OK", "OK", "OK"],
+            "answer_idx": 0,
+            "explain": "Temporary issue creating questions from sources. Please reload in a bit.",
+            "source": "https://medlineplus.gov/",
+            "topic": display_topic,
+        }]
+
+    random.shuffle(items_gen)
+    return create_quiz(display_topic, is_daily=True, items=items_gen[:10])
+def ensure_ten_mcqs(display_topic: str, mix_topics: list[str], target: int = 10) -> list[dict]:
+    """
+    Try GPT and OSS first, then GUARANTEE `target` items by backfilling with
+    mixed-topic fallbacks. Ensures uniqueness and trims to target.
+    """
+    items: list[dict] = []
+
+    # 1) GPT on display topic
+    items.extend(gpt_generate_mcqs(display_topic, n_questions=target))
+
+    # 2) GPT on broader mix
+    if len(items) < target and mix_topics:
+        broader_topic = ", ".join([t for t in mix_topics if t]) or display_topic
+        more = gpt_generate_mcqs(broader_topic, n_questions=target)
+        items = ensure_unique_items(items + more, topic="__mixed__")
+
+    # 3) OSS on display topic (trusted pages)
+    if len(items) < target:
+        ctx = fetch_trusted_pages(get_trusted_sources_from_session_fallback(display_topic))
+        more = oss_generate_mcqs(display_topic, ctx) or []
+        items = ensure_unique_items(items + more, topic="__mixed__")
+
+    # 4) OSS on broader mix
+    if len(items) < target and mix_topics:
+        broader_topic = ", ".join([t for t in mix_topics if t]) or display_topic
+        ctx = fetch_trusted_pages(get_trusted_sources_from_session_fallback(broader_topic))
+        more = oss_generate_mcqs(broader_topic, ctx) or []
+        items = ensure_unique_items(items + more, topic="__mixed__")
+
+    # 5) FINAL GUARANTEE: backfill with mixed-topic synthetic items
+    if len(items) < target:
+        # prefer user/mix topics, then pad with presets
+        topics_pool = [t for t in (mix_topics or []) if t] + [t for t in PRESET_TOPICS]
+        # draw small batches until we hit target
+        i = 0
+        while len(items) < target:
+            topic = topics_pool[i % len(topics_pool)]
+            need = target - len(items)
+            batch = diversified_fallback(topic, n=min(3, need))
+            items = ensure_unique_items(items + batch, topic="__mixed__")
+            i += 1
+
+    random.shuffle(items)
+    return items[:target]
+
+def _balanced_answer_positions(n: int) -> list[int]:
+    """Return a list of indices 0..3 roughly balanced across n questions."""
+    base = [0,1,2,3] * ((n+3)//4)
+    random.shuffle(base)
+    return base[:n]
+def diversified_fallback(topic: str, n: int = 10) -> list[dict]:
+    subthemes = [
+        "basic facts & definitions", "common myths", "who should avoid",
+        "possible side effects", "evidence quality", "interactions/contraindications",
+        "safe use & moderation", "when to seek professional advice",
+        "reliability of sources", "applying guidance for teens",
+        "benefits vs. risks", "frequency/duration", "warning signs", "social media claims",
+        "long-term effects", "dosage and limits", "age-specific considerations",
+        "overhyped benefits", "misleading marketing", "peer pressure and trends",
+        "emergency situations", "mixing with other substances", "ethical concerns",
+        "influence of celebrities", "online misinformation tactics"
+    ]
+
+    stems = [
+        "Which statement about '{topic}' and {sub} is most accurate?",
+        "For teens, what is a safe takeaway regarding '{topic}' and {sub}?",
+        "Which claim about '{topic}' and {sub} aligns best with evidence?",
+        "What is a reasonable first step if considering '{topic}' related to {sub}?",
+        "Which source is most appropriate when evaluating '{topic}' and {sub}?",
+        "How should someone verify information about '{topic}' and {sub}?",
+        "What is a common misunderstanding about '{topic}' and {sub}?",
+        "When learning about '{topic}' and {sub}, what is the safest action?",
+        "Which fact about '{topic}' and {sub} would a health expert agree with?",
+        "What is the biggest risk to teens when it comes to '{topic}' and {sub}?"
+    ]
+
+    distractor_buckets = [
+        ["Always safe for everyone.", "Works 100% of the time.", "Replaces medical care.", "Has zero side effects."],
+        ["Social media posts are sufficient.", "Personal anecdotes prove efficacy.", "No need to read warnings.",
+         "Doctors are unnecessary."],
+        ["Immediate results are guaranteed.", "One-size-fits-all dosage works.", "Natural means risk-free.",
+         "Label claims are always verified."],
+        ["Everyone should try it at least once.", "The more you take, the better.",
+         "Health advice on TikTok is always accurate.", "If it's popular, it must be safe."],
+        ["There is no risk if it’s natural.", "All studies online are equally reliable.",
+         "Side effects only happen to older adults.", "You don’t need to consult anyone."]
+    ]
+
+    correct_templates = [
+        "Benefits and risks vary by person; consult credible health sources.",
+        "Evidence should come from organizations like WHO/CDC/NIH/MedlinePlus.",
+        "Discuss with a healthcare professional, especially for teens or chronic conditions.",
+        "Avoid treating it as a cure-all; monitor for side effects and interactions.",
+        "Use guidance from credible sources before changing diet, supplements, or routines.",
+        "Look for peer-reviewed studies or government health agencies.",
+        "Health claims on social media are often exaggerated; confirm with experts.",
+        "Trusted sources are better than personal anecdotes or viral trends.",
+        "When in doubt, consult a licensed doctor or pharmacist.",
+        "Safety and dosage can differ by age and health condition; tailor advice."
+    ]
+
+    ans_positions = _balanced_answer_positions(n)
+    items = []
+    for i in range(n):
+        sub = random.choice(subthemes)
+        stem = random.choice(stems).format(topic=topic, sub=sub)
+        correct = random.choice(correct_templates)
+        distractors = random.choice(distractor_buckets)[:3]
+        choices = distractors[:]
+        idx = ans_positions[i]
+        choices.insert(idx, correct)
+        items.append({
+            "q": stem,
+            "choices": choices,
+            "answer_idx": idx,
+            "explain": f"Credible guidance (e.g., WHO/CDC/NIH/MedlinePlus) cautions that '{topic}' is not a cure-all; weigh benefits/risks and seek professional advice when needed.",
+            "source": "https://medlineplus.gov/",
+            "topic": topic,  # <= per-item tag
+        })
+    return items
+# poster_gen.py
+import os, base64, uuid
+from datetime import datetime, timezone
+from openai import OpenAI
+
+POSTER_DIR = os.path.join(os.path.dirname(__file__), "static", "posters")
+os.makedirs(POSTER_DIR, exist_ok=True)
+
+def utcnow_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+def poster_prompt(topic: str, subtheme: str, audience: str) -> str:
+    # short, directive, print-minded prompt
+    return f"""
+Design a clean, evidence-based educational poster about "{topic}" focused on "{subtheme}" for teens ({audience}).
+Style: modern school health poster, minimal icons, big headline, legible body, subtle accent shapes.
+Avoid medical advice; avoid logos; no small text blocks. Include short checklist/flags area.
+Color palette: cool neutrals + one accent. No brand text.
+"""
+# studio.py
+import os, json, textwrap, random
+from datetime import datetime, timedelta, timezone
+from flask import Blueprint, render_template, request, redirect, url_for, g, flash, abort
+from zoneinfo import ZoneInfo
+from werkzeug.utils import secure_filename
+
+studio = Blueprint("studio", __name__, template_folder="templates")
+
+SLUG_ALPH = "abcdefghjkmnpqrstuvwxyz23456789"
+def _slug(n=8):
+    import secrets; return "".join(secrets.choice(SLUG_ALPH) for _ in range(n))
+
+def _unique_slug(db):
+    for _ in range(12):
+        s = _slug()
+        r = db.execute("SELECT 1 FROM poster_campaigns WHERE slug=?", (s,)).fetchone()
+        if not r: return s
+    return _slug(10)
+
+def _first_monday_on_or_after(d: datetime) -> datetime:
+    wd = d.weekday()
+    return d if wd == 0 else d + timedelta(days=(7 - wd))
+
+@studio.route("/studio")
+def studio_home():
+    if not g.user:
+        return redirect(url_for("login", next=request.path))
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, title, topic, audience, visibility, slug, starts_on, weeks, created_at "
+        "FROM poster_campaigns WHERE user_id=? ORDER BY id DESC",
+        (g.user["id"],)
+    ).fetchall()
+    return render_template("studio/index.html", rows=[dict(r) for r in rows])
+
+@studio.route("/studio/new", methods=["GET","POST"])
+def studio_new():
+    if not g.user:
+        return redirect(url_for("login", next=request.path))
+
+    error = None
+    if request.method == "POST":
+        title     = (request.form.get("title") or "").strip()
+        topic     = (request.form.get("topic") or "").strip()
+        audience  = (request.form.get("audience") or "school_club").strip()
+        visibility= (request.form.get("visibility") or "public").strip()
+        weeks     = int(request.form.get("weeks") or 4)
+        starts_on = (request.form.get("starts_on") or "").strip()
+
+        if not title or not topic:
+            error = "Title and topic are required."
+        else:
+            if not starts_on:
+                now_local = datetime.now(ZoneInfo(APP_TZ))
+                starts_on = _first_monday_on_or_after(now_local).astimezone(timezone.utc).date().isoformat()
+            try:
+                db = get_db()
+                slug = _unique_slug(db)
+                db.execute(
+                    "INSERT INTO poster_campaigns (user_id,title,topic,audience,visibility,starts_on,weeks,slug,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (g.user["id"], title, topic, audience, visibility, starts_on, weeks, slug, iso_now())
+                )
+                db.commit()
+                cid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+                return redirect(url_for("studio_view", campaign_id=cid))
+            except Exception:
+                error = "Failed to create."
+    return render_template("studio/new.html", error=error)
+
+@studio.route("/studio/c/<int:campaign_id>")
+def studio_view(campaign_id: int):
+    if not g.user:
+        return redirect(url_for("login", next=request.path))
+    db = get_db()
+    camp = db.execute(
+        "SELECT * FROM poster_campaigns WHERE id=? AND user_id=?",
+        (campaign_id, g.user["id"])
+    ).fetchone()
+    if not camp:
+        flash("Not found", "warning")
+        return redirect(url_for("studio_home"))
+
+    posters = db.execute(
+        "SELECT * FROM posters WHERE campaign_id=? ORDER BY week_no",
+        (campaign_id,)
+    ).fetchall()
+
+    return render_template("studio/view.html", campaign=dict(camp), posters=[dict(p) for p in posters])
+
+@studio.route("/studio/generate", methods=["POST"])
+def studio_generate():
+    if not g.user:
+        abort(403)
+    db = get_db()
+    campaign_id = int(request.form.get("campaign_id") or 0)
+    week_no     = int(request.form.get("week_no") or 1)
+    subtheme    = (request.form.get("subtheme") or "common myths").strip()
+    seed        = (request.form.get("seed") or "").strip() or None
+    w           = int(request.form.get("w") or 1024)
+    h           = int(request.form.get("h") or 1536)
+
+    camp = db.execute(
+        "SELECT id, topic, audience FROM poster_campaigns WHERE id=? AND user_id=?",
+        (campaign_id, g.user["id"])
+    ).fetchone()
+    if not camp:
+        abort(404)
+
+    abs_path, name = generate_poster_png(topic=camp["topic"], subtheme=subtheme, audience=camp["audience"],
+                                         seed=seed, width=w, height=h)
+    rel_path = f"static/posters/{name}"
+    prompt_used = f"{camp['topic']} — {subtheme} — {camp['audience']}"
+
+    db.execute(
+        "INSERT INTO posters (campaign_id, week_no, prompt, img_path, seed, width, height, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (campaign_id, week_no, prompt_used, rel_path, seed, w, h, iso_now())
+    )
+    db.commit()
+    return redirect(url_for("studio_view", campaign_id=campaign_id))
+
+@studio.route("/p/<slug>")
+def studio_public(slug: str):
+    db = get_db()
+    camp = db.execute("SELECT * FROM poster_campaigns WHERE slug=?", (slug,)).fetchone()
+    if not camp: abort(404)
+    if camp["visibility"] != "public":
+        flash("This campaign is private.", "warning")
+        return redirect(url_for("index"))
+
+    posters = db.execute(
+        "SELECT week_no, img_path FROM posters WHERE campaign_id=? ORDER BY week_no",
+        (camp["id"],)
+    ).fetchall()
+    return render_template("studio/public.html",
+                           campaign=dict(camp),
+                           posters=[dict(p) for p in posters])
+
+def generate_poster_png(topic: str, subtheme: str, audience: str, seed: str | None = None,
+                        width=1024, height=1536) -> tuple[str, str]:
+    """
+    Returns (absolute_file_path, file_basename). Requires OPENAI_API_KEY.
+    """
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    prompt = poster_prompt(topic, subtheme, audience)
+
+    # Ask for PNG; tall doc for poster feel
+    resp = client.images.generate(
+        model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1"),
+        prompt=prompt.strip(),
+        size=f"{width}x{height}",
+        n=1,
+        # NOTE: you can also use 'seed' via 'prompt' or metadata;
+        # some SDKs expose seed directly; if not, keep in DB for reference.
+    )
+
+    b64 = resp.data[0].b64_json
+    raw = base64.b64decode(b64)
+    name = f"poster_{uuid.uuid4().hex}.png"
+    out_path = os.path.join(POSTER_DIR, name)
+    with open(out_path, "wb") as f:
+        f.write(raw)
+    return out_path, name
+
+
+# ---- NEW: multi-topic helpers ----
+def _topics_from_session(primary_topic: str | None, needed: int = 4) -> list[str]:
+    """Pick a small set of topics to mix into a quiz."""
+    pool = []
+    if primary_topic:
+        pool.append(primary_topic.strip())
+
+    kw = (session.get("last_keywords") or "").strip()
+    if kw and kw.lower() not in [t.lower() for t in pool]:
+        pool.append(kw)
+
+    misc = [
+        "detox", "weight loss myths", "ozone therapy", "juice cleanse",
+        "apple cider vinegar for fat loss", "cold plunge health claims",
+        "vitamin megadosing", "spot reduction", "intermittent fasting for teens",
+        "ketogenic diet for teens"
+    ]
+    for t in misc:
+        if len(pool) >= needed:
+            break
+        if t.lower() not in [x.lower() for x in pool]:
+            pool.append(t)
+    return pool[:needed]
+def multi_topic_fallback(topics: list[str], n: int = 10) -> list[dict]:
+    """Build a mixed quiz drawing items from several topics."""
+    if not topics:
+        topics = ["general health"]
+    items: list[dict] = []
+    ti = 0
+    while len(items) < n:
+        t = topics[ti % len(topics)]
+        batch = diversified_fallback(t, n=min(2, n - len(items)))  # items carry topic=t
+        items.extend(batch)
+        ti += 1
+    items = ensure_unique_items(items, topic="__mixed__")
+    random.shuffle(items)
+    return items[:n]
+
+
+
 def safe_get(url, headers=None, timeout=12, params=None):
     try:
         r = requests.get(url, headers=headers or COMMON_HEADERS, params=params, timeout=timeout)
@@ -468,12 +908,12 @@ def safe_get(url, headers=None, timeout=12, params=None):
         return r
     except Exception:
         return None
-
 def gpt_generate_mcqs(topic: str, n_questions: int = 10):
     if not (_OPENAI_AVAILABLE and os.getenv("OPENAI_API_KEY")):
         return []
 
     def _postprocess(items: list[dict]) -> list[dict]:
+        # Validate + dedupe (keeps your safety around domains)
         valid = []
         for it in (items or []):
             if not isinstance(it, dict):
@@ -502,6 +942,7 @@ def gpt_generate_mcqs(topic: str, n_questions: int = 10):
 
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
         sys_msg = (
             "You create safe, accurate multiple-choice questions (MCQs) for teens about health misinformation.\n"
             "Return STRICT JSON with key 'items' only. EXACTLY 10 items, no extra keys.\n"
@@ -509,17 +950,41 @@ def gpt_generate_mcqs(topic: str, n_questions: int = 10):
             "- Cover DIFFERENT subtopics; use at least 8 distinct subthemes from the provided list.\n"
             "- Each item: {q, choices[4], answer_idx (0..3), explain (1-2 sentences), source (WHO/CDC/NIH/MedlinePlus/NCBI)}.\n"
             "- Natural, varied wording (no templated stems). Avoid medical advice; stay neutral and evidence-based.\n"
-            "- Distribute answer_idx positions across items.\n"
+            "- Distribute answer_idx positions across items (don’t always use the same index).\n"
             "- If an item narrows to a subtopic, include a 'topic' field per item.\n"
         )
-        usr_payload = {"topic": topic, "n": n_questions, "subthemes": SUBTHEMES}
+
+        usr_payload = {
+            "topic": topic,
+            "n": n_questions,
+            "subthemes": SUBTHEMES,
+            "format": {
+                "items": [{
+                    "q": "string",
+                    "choices": ["string","string","string","string"],
+                    "answer_idx": 0,
+                    "explain": "string",
+                    "source": "https://(who.int|cdc.gov|nih.gov|medlineplus.gov|ncbi.nlm.nih.gov)/...",
+                    "topic": "optional more-specific subtopic"
+                }]
+            }
+        }
+
         resp = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             temperature=0.2,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": sys_msg},
-                {"role": "user", "content": "Generate EXACTLY 10 MCQs. Return JSON with only key 'items'.\n" + json.dumps(usr_payload, ensure_ascii=False)},
+                {
+                    "role": "user",
+                    "content": (
+                        "Generate EXACTLY 10 MCQs covering at least 8 distinct subthemes from the list. "
+                        "Use the topic below as the umbrella (it can be composite like 'term1, term2, term3'). "
+                        "Return JSON with only the key 'items'.\n\n"
+                        + json.dumps(usr_payload, ensure_ascii=False)
+                    )
+                },
             ],
             timeout=45
         )
@@ -528,14 +993,17 @@ def gpt_generate_mcqs(topic: str, n_questions: int = 10):
     except Exception:
         return []
 
+
 def oss_generate_mcqs(topic, contexts):
     try:
         from Questgen import main as qg
     except Exception:
         return []
+
     base_text = "\n\n".join(c["text"] for c in contexts)[:4000]
     if not base_text:
         return []
+
     try:
         qg_handler = qg.QGen()
         payload = {"input_text": base_text}
@@ -552,12 +1020,15 @@ def oss_generate_mcqs(topic, contexts):
                     "answer_idx": opts.index(ans),
                     "explain": "Derived from trusted excerpts.",
                     "source": (contexts[0]["url"] if contexts else ""),
-                    "topic": topic,
+                    "topic": topic,  # <= tag with parent topic
                 })
         return items
     except Exception:
         return []
 
+# =========================
+# Monitor-derived sources (optional)
+# =========================
 def get_trusted_sources_from_session_fallback(topic, max_urls=4):
     urls = []
     last = session.get("last_results")
@@ -581,20 +1052,32 @@ def get_trusted_sources_from_session_fallback(topic, max_urls=4):
         ]
     return list(dict.fromkeys(urls))[:max_urls]
 
-PRESET_TOPICS = [
-    "detox",
-    "garlic weight loss",
-    "ozone therapy",
-    "juice cleanse",
-    "apple cider vinegar for fat loss",
-    "cold plunge health claims",
-    "vitamin megadosing",
-    "spot reduction",
-    "intermittent fasting for teens",
-    "ketogenic diet for teens",
-]
 
+# =========================
+# Daily topic selection
+# =========================
+def pick_daily_topic():
+    kw = (session.get("last_keywords") or "").strip()
+    if kw:
+        return kw
+    fallback_topics = [
+        "detox",
+        "garlic weight loss",
+        "ozone therapy",
+        "juice cleanse",
+        "apple cider vinegar for fat loss",
+        "cold plunge health claims",
+        "vitamin megadosing",
+        "spot reduction",
+        "intermittent fasting for teens",
+        "ketogenic diet for teens",
+    ]
+    return fallback_topics[int(time.time()) % len(fallback_topics)]
 def recent_search_terms(user_id: int | None, limit: int = 3) -> list[str]:
+    """
+    Return up to `limit` distinct, most-recent keywords the user searched for.
+    Falls back to session['last_keywords'] if present and not already included.
+    """
     terms: list[str] = []
     try:
         db = get_db()
@@ -609,11 +1092,14 @@ def recent_search_terms(user_id: int | None, limit: int = 3) -> list[str]:
                 """,
                 (user_id,)
             ).fetchall()
+
+            # collect unique terms in order
             seen = set()
             for r in rows:
                 kw = (r["keywords"] or "").strip()
                 if not kw:
                     continue
+                # split on commas to allow multi-keyword saves, keep simple
                 for part in [x.strip() for x in kw.split(",") if x.strip()]:
                     if part.lower() not in seen:
                         seen.add(part.lower())
@@ -622,12 +1108,18 @@ def recent_search_terms(user_id: int | None, limit: int = 3) -> list[str]:
                             break
                 if len(terms) >= limit:
                     break
+
+        # also consider the last_keywords in session as a final candidate
         session_kw = (session.get("last_keywords") or "").strip()
         if session_kw and all(session_kw.lower() != t.lower() for t in terms):
             terms.append(session_kw)
+
     except Exception:
         pass
-    deduped, seen_low = [], set()
+
+    # keep at most limit and ensure uniqueness preserving order
+    deduped = []
+    seen_low = set()
     for t in terms:
         low = t.lower()
         if low not in seen_low:
@@ -637,8 +1129,28 @@ def recent_search_terms(user_id: int | None, limit: int = 3) -> list[str]:
             break
     return deduped[:limit]
 
+
+PRESET_TOPICS = [
+    "detox",
+    "garlic weight loss",
+    "ozone therapy",
+    "juice cleanse",
+    "apple cider vinegar for fat loss",
+    "cold plunge health claims",
+    "vitamin megadosing",
+    "spot reduction",
+    "intermittent fasting for teens",
+    "ketogenic diet for teens",
+]
+
 def composite_topic_for_today(user_id: int | None, max_terms: int = 3) -> tuple[str, list[str]]:
+    """
+    Compose a display topic like 'term1, term2, term3'.
+    Also return the list of topics to mix for fallback generation.
+    If no/too few recent terms, pad with PRESET_TOPICS.
+    """
     recent = recent_search_terms(user_id, limit=max_terms)
+    # pad if needed
     if len(recent) < max_terms:
         for p in PRESET_TOPICS:
             if len(recent) >= max_terms:
@@ -648,327 +1160,24 @@ def composite_topic_for_today(user_id: int | None, max_terms: int = 3) -> tuple[
     display = ", ".join(recent[:max_terms]) if recent else PRESET_TOPICS[0]
     return display, recent[:max_terms]
 
-def _balanced_answer_positions(n: int) -> list[int]:
-    base = [0,1,2,3] * ((n+3)//4)
-    random.shuffle(base)
-    return base[:n]
 
-def diversified_fallback(topic: str, n: int = 10) -> list[dict]:
-    subthemes = SUBTHEMES[:]
-    stems = [
-        "Which statement about '{topic}' and {sub} is most accurate?",
-        "For teens, what is a safe takeaway regarding '{topic}' and {sub}?",
-        "Which claim about '{topic}' and {sub} aligns best with evidence?",
-        "What is a reasonable first step if considering '{topic}' related to {sub}?",
-        "Which source is most appropriate when evaluating '{topic}' and {sub}?",
-        "How should someone verify information about '{topic}' and {sub}?",
-        "What is a common misunderstanding about '{topic}' and {sub}?",
-        "When learning about '{topic}' and {sub}, what is the safest action?",
-        "Which fact about '{topic}' and {sub} would a health expert agree with?",
-        "What is the biggest risk to teens when it comes to '{topic}' and {sub}?"
-    ]
-    distractor_buckets = [
-        ["Always safe for everyone.", "Works 100% of the time.", "Replaces medical care.", "Has zero side effects."],
-        ["Social media posts are sufficient.", "Personal anecdotes prove efficacy.", "No need to read warnings.",
-         "Doctors are unnecessary."],
-        ["Immediate results are guaranteed.", "One-size-fits-all dosage works.", "Natural means risk-free.",
-         "Label claims are always verified."],
-        ["Everyone should try it at least once.", "The more you take, the better.",
-         "Health advice on TikTok is always accurate.", "If it's popular, it must be safe."],
-        ["There is no risk if it’s natural.", "All studies online are equally reliable.",
-         "Side effects only happen to older adults.", "You don’t need to consult anyone."]
-    ]
-    correct_templates = [
-        "Benefits and risks vary by person; consult credible health sources.",
-        "Evidence should come from organizations like WHO/CDC/NIH/MedlinePlus.",
-        "Discuss with a healthcare professional, especially for teens or chronic conditions.",
-        "Avoid treating it as a cure-all; monitor for side effects and interactions.",
-        "Use guidance from credible sources before changing diet, supplements, or routines.",
-        "Look for peer-reviewed studies or government health agencies.",
-        "Health claims on social media are often exaggerated; confirm with experts.",
-        "Trusted sources are better than personal anecdotes or viral trends.",
-        "When in doubt, consult a licensed doctor or pharmacist.",
-        "Safety and dosage can differ by age and health condition; tailor advice."
-    ]
-    ans_positions = _balanced_answer_positions(n)
-    items = []
-    for i in range(n):
-        sub = random.choice(subthemes)
-        stem = random.choice(stems).format(topic=topic, sub=sub)
-        correct = random.choice(correct_templates)
-        distractors = random.choice(distractor_buckets)[:3]
-        choices = distractors[:]
-        idx = ans_positions[i]
-        choices.insert(idx, correct)
-        items.append({
-            "q": stem,
-            "choices": choices,
-            "answer_idx": idx,
-            "explain": f"Credible guidance (e.g., WHO/CDC/NIH/MedlinePlus) cautions that '{topic}' is not a cure-all; weigh benefits/risks and seek professional advice when needed.",
-            "source": "https://medlineplus.gov/",
-            "topic": topic,
-        })
-    return items
-
-def ensure_ten_mcqs(display_topic: str, mix_topics: list[str], target: int = 10) -> list[dict]:
-    items: list[dict] = []
-    items.extend(gpt_generate_mcqs(display_topic, n_questions=target))
-    if len(items) < target and mix_topics:
-        broader_topic = ", ".join([t for t in mix_topics if t]) or display_topic
-        more = gpt_generate_mcqs(broader_topic, n_questions=target)
-        items = ensure_unique_items(items + more, topic="__mixed__")
-    if len(items) < target:
-        ctx = fetch_trusted_pages(get_trusted_sources_from_session_fallback(display_topic))
-        more = oss_generate_mcqs(display_topic, ctx) or []
-        items = ensure_unique_items(items + more, topic="__mixed__")
-    if len(items) < target and mix_topics:
-        broader_topic = ", ".join([t for t in mix_topics if t]) or display_topic
-        ctx = fetch_trusted_pages(get_trusted_sources_from_session_fallback(broader_topic))
-        more = oss_generate_mcqs(broader_topic, ctx) or []
-        items = ensure_unique_items(items + more, topic="__mixed__")
-    if len(items) < target:
-        topics_pool = [t for t in (mix_topics or []) if t] + [t for t in PRESET_TOPICS]
-        i = 0
-        while len(items) < target:
-            topic = topics_pool[i % len(topics_pool)]
-            need = target - len(items)
-            batch = diversified_fallback(topic, n=min(3, need))
-            items = ensure_unique_items(items + batch, topic="__mixed__")
-            i += 1
-    random.shuffle(items)
-    return items[:target]
+# =========================
+# Simple misinfo pattern fallback (for monitor)
+# =========================
+MISINFO_PATTERNS = [
+    r"detox water|flush toxins|7[- ]day detox",
+    r"raw garlic cures|cure[- ]?all|miracle cure",
+    r"lose \d+\s?(kg|lbs) in \d+\s?(days?|weeks?)",
+    r"spot reduction|melt fat",
+    r"no side effects",
+    r"ozone therapy cures",
+]
+MISINFO_RE = re.compile("|".join(MISINFO_PATTERNS), re.I)
 
 
-# ========= Poster generator =========
-POSTER_DIR = os.path.join(os.path.dirname(__file__), "static", "posters")
-os.makedirs(POSTER_DIR, exist_ok=True)
-
-def poster_prompt(topic: str, subtheme: str, audience: str) -> str:
-    return f"""
-Design a clean, evidence-based educational poster about "{topic}" focused on "{subtheme}" for teens ({audience}).
-Style: modern school health poster, minimal icons, big headline, legible body, subtle accent shapes.
-Avoid medical advice; avoid logos; no small text blocks. Include short checklist/flags area.
-Color palette: cool neutrals + one accent. No brand text.
-"""
-
-def generate_poster_png(topic: str, subtheme: str, audience: str, seed: str | None = None,
-                        width=1024, height=1536) -> tuple[str, str]:
-    """
-    Returns (absolute_file_path, file_basename). Requires OPENAI_API_KEY.
-    """
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = poster_prompt(topic, subtheme, audience)
-    resp = client.images.generate(
-        model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1"),
-        prompt=prompt.strip(),
-        size=f"{width}x{height}",
-        n=1,
-    )
-    b64 = resp.data[0].b64_json
-    raw = base64.b64decode(b64)
-    name = f"poster_{uuid.uuid4().hex}.png"
-    out_path = os.path.join(POSTER_DIR, name)
-    with open(out_path, "wb") as f:
-        f.write(raw)
-    return out_path, name
-
-
-# ========= Studio blueprint =========
-studio = Blueprint("studio", __name__, template_folder="templates")
-
-SLUG_ALPH = "abcdefghjkmnpqrstuvwxyz23456789"
-def _slug(n=8):
-    return "".join(secrets.choice(SLUG_ALPH) for _ in range(n))
-
-def _unique_slug(db):
-    for _ in range(12):
-        s = _slug()
-        r = db.execute("SELECT 1 FROM poster_campaigns WHERE slug=?", (s,)).fetchone()
-        if not r:
-            return s
-    return _slug(10)
-
-def _first_monday_on_or_after(d: datetime) -> datetime:
-    wd = d.weekday()
-    return d if wd == 0 else d + timedelta(days=(7 - wd))
-
-@studio.route("/studio")
-def studio_home():
-    if not g.user:
-        return redirect(url_for("login", next=request.path))
-    db = get_db()
-    rows = db.execute(
-        "SELECT id, title, topic, audience, visibility, slug, starts_on, weeks, created_at "
-        "FROM poster_campaigns WHERE user_id=? ORDER BY id DESC",
-        (g.user["id"],)
-    ).fetchall()
-    return render_template("studio/index.html", rows=[dict(r) for r in rows])
-
-@studio.route("/studio/new", methods=["GET","POST"])
-def studio_new():
-    if not g.user:
-        return redirect(url_for("login", next=request.path))
-    error = None
-    if request.method == "POST":
-        title     = (request.form.get("title") or "").strip()
-        topic     = (request.form.get("topic") or "").strip()
-        audience  = (request.form.get("audience") or "school_club").strip()
-        visibility= (request.form.get("visibility") or "public").strip()
-        weeks     = int(request.form.get("weeks") or 4)
-        starts_on = (request.form.get("starts_on") or "").strip()
-        if not title or not topic:
-            error = "Title and topic are required."
-        else:
-            if not starts_on:
-                now_local = datetime.now(ZoneInfo(APP_TZ))
-                starts_on = _first_monday_on_or_after(now_local).astimezone(timezone.utc).date().isoformat()
-            try:
-                db = get_db()
-                slug = _unique_slug(db)
-                db.execute(
-                    "INSERT INTO poster_campaigns (user_id,title,topic,audience,visibility,starts_on,weeks,slug,created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?,?)",
-                    (g.user["id"], title, topic, audience, visibility, starts_on, weeks, slug, iso_now())
-                )
-                db.commit()
-                cid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                return redirect(url_for("studio.studio_view", campaign_id=cid))
-            except Exception:
-                error = "Failed to create."
-    return render_template("studio/new.html", error=error)
-
-@studio.route("/studio/c/<int:campaign_id>")
-def studio_view(campaign_id: int):
-    if not g.user:
-        return redirect(url_for("login", next=request.path))
-    db = get_db()
-    camp = db.execute(
-        "SELECT * FROM poster_campaigns WHERE id=? AND user_id=?",
-        (campaign_id, g.user["id"])
-    ).fetchone()
-    if not camp:
-        flash("Not found", "warning")
-        return redirect(url_for("studio.studio_home"))
-    posters = db.execute(
-        "SELECT * FROM posters WHERE campaign_id=? ORDER BY week_no",
-        (campaign_id,)
-    ).fetchall()
-    return render_template("studio/view.html", campaign=dict(camp), posters=[dict(p) for p in posters])
-
-@studio.route("/studio/generate", methods=["POST"])
-def studio_generate():
-    if not g.user:
-        abort(403)
-    db = get_db()
-    campaign_id = int(request.form.get("campaign_id") or 0)
-    week_no     = int(request.form.get("week_no") or 1)
-    subtheme    = (request.form.get("subtheme") or "common myths").strip()
-    seed        = (request.form.get("seed") or "").strip() or None
-    w           = int(request.form.get("w") or 1024)
-    h           = int(request.form.get("h") or 1536)
-
-    camp = db.execute(
-        "SELECT id, topic, audience FROM poster_campaigns WHERE id=? AND user_id=?",
-        (campaign_id, g.user["id"])
-    ).fetchone()
-    if not camp:
-        abort(404)
-
-    abs_path, name = generate_poster_png(
-        topic=camp["topic"], subtheme=subtheme, audience=camp["audience"],
-        seed=seed, width=w, height=h
-    )
-    rel_path = f"static/posters/{name}"
-    prompt_used = f"{camp['topic']} — {subtheme} — {camp['audience']}"
-    db.execute(
-        "INSERT INTO posters (campaign_id, week_no, prompt, img_path, seed, width, height, created_at) "
-        "VALUES (?,?,?,?,?,?,?,?)",
-        (campaign_id, week_no, prompt_used, rel_path, seed, w, h, iso_now())
-    )
-    db.commit()
-    return redirect(url_for("studio.studio_view", campaign_id=campaign_id))
-
-# Fetch a plain-text transcript for a YouTube video (best-effort, safe fallback)
-def get_youtube_transcript(video_id: str, max_chars: int = 4000) -> str | None:
-    """
-    Returns a concatenated transcript string if available, otherwise None.
-    Respects the optional youtube_transcript_api dependency and handles common errors.
-    """
-    if not (_YT_TRANSCRIPT_AVAILABLE and video_id):
-        return None
-
-    try:
-        # Try English first, then auto-generated/other languages (tweak as needed)
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-
-        preferred = None
-        # Prefer a manually-created English transcript if present
-        for lang in ("en", "en-US", "en-GB"):
-            if transcript_list.find_transcript([lang]).is_generated is False:
-                preferred = transcript_list.find_transcript([lang])
-                break
-
-        # Otherwise accept an English auto-generated transcript
-        if preferred is None:
-            for lang in ("en", "en-US", "en-GB"):
-                try:
-                    t = transcript_list.find_transcript([lang])
-                    preferred = t  # may be auto-generated
-                    break
-                except Exception:
-                    pass
-
-        # As a final fallback, just pick the first transcript available
-        if preferred is None:
-            try:
-                preferred = next(iter(transcript_list))
-            except StopIteration:
-                return None
-
-        chunks = preferred.fetch()
-        text = " ".join((c.get("text") or "").replace("\n", " ").strip() for c in chunks if c.get("text"))
-        text = " ".join(text.split())[:max_chars]
-        return text or None
-
-    except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
-        return None
-    except Exception:
-        return None
-
-
-@studio.route("/p/<slug>")
-def studio_public(slug: str):
-    db = get_db()
-    camp = db.execute("SELECT * FROM poster_campaigns WHERE slug=?", (slug,)).fetchone()
-    if not camp:
-        abort(404)
-    if camp["visibility"] != "public":
-        flash("This campaign is private.", "warning")
-        return redirect(url_for("index"))
-    posters = db.execute(
-        "SELECT week_no, img_path FROM posters WHERE campaign_id=? ORDER BY week_no",
-        (camp["id"],)
-    ).fetchall()
-    return render_template("studio/public.html",
-                           campaign=dict(camp),
-                           posters=[dict(p) for p in posters])
-
-# Register blueprint
-app.register_blueprint(studio)
-
-
-# ========= Monitoring (YouTube/Reddit) =========
-def _extract_yt_video_id(link):
-    if not link:
-        return None
-    try:
-        qs = parse_qs(urlparse(link).query)
-        if "v" in qs and qs["v"]:
-            return qs["v"][0]
-    except Exception:
-        pass
-    return None
-
+# =========================
+# YouTube & Reddit Fetchers
+# =========================
 def fetch_youtube_search(keyword, limit=10):
     key = os.getenv("YT_API_KEY")
     if key:
@@ -993,10 +1202,17 @@ def _yt_api_search(keyword, key, limit):
     try:
         r = requests.get(url, headers=COMMON_HEADERS, params=params, timeout=12)
         if r.status_code != 200:
+            try:
+                err = r.json()
+            except Exception:
+                err = r.text[:400]
+            app.logger.warning("YouTube API %s for %r: %s", r.status_code, keyword, err)
             return []
         data = r.json()
     except Exception:
+        app.logger.exception("YouTube API request crashed for %r", keyword)
         return []
+
     items = []
     for it in data.get("items", []):
         sn = it.get("snippet", {}) or {}
@@ -1020,7 +1236,10 @@ def _yt_api_search(keyword, key, limit):
         })
         if len(items) >= limit:
             break
+    if not items:
+        app.logger.warning("YouTube API returned 0 items for %r (q=%s)", keyword, keyword)
     return items
+
 
 def _yt_rss_search(keyword, limit):
     feed_url = f"https://www.youtube.com/feeds/videos.xml?search_query={requests.utils.quote(keyword)}"
@@ -1054,6 +1273,17 @@ def _yt_rss_search(keyword, limit):
         })
     return items
 
+def _extract_yt_video_id(link):
+    if not link:
+        return None
+    try:
+        qs = parse_qs(urlparse(link).query)
+        if "v" in qs and qs["v"]:
+            return qs["v"][0]
+    except Exception:
+        pass
+    return None
+
 def fetch_reddit_search(keyword, limit=10):
     url = "https://www.reddit.com/search.json"
     params = {"q": keyword, "sort": "new", "t": "week", "limit": min(limit, 25)}
@@ -1086,7 +1316,28 @@ def fetch_reddit_search(keyword, limit=10):
     return out
 
 
-# ========= AI Validation =========
+# =========================
+# YouTube transcript helper
+# =========================
+def get_youtube_transcript(video_id, languages=("en", "en-US", "en-GB", "ko", "ko-KR"), max_chars=2000):
+    if not _YT_TRANSCRIPT_AVAILABLE or not video_id:
+        return None
+    try:
+        srt = YouTubeTranscriptApi.get_transcript(video_id, languages=list(languages))
+        chunks = [seg.get("text", "") for seg in srt if seg.get("text")]
+        text = " ".join(chunks).strip()
+        if not text:
+            return None
+        return text[:max_chars]
+    except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
+        return None
+    except Exception:
+        return None
+
+
+# =========================
+# AI Validation (monitor)
+# =========================
 AI_SYSTEM = (
     "You are a health misinformation analyst for youth-focused social media. "
     "Given a short post, return strict JSON with keys: "
@@ -1094,15 +1345,15 @@ AI_SYSTEM = (
     "explanation (2-3 sentences), and citations (array of {title, url}). "
     "Prefer WHO, CDC, NIH, peer-reviewed sources."
 )
-
 def ensure_anon_id() -> str | None:
+    """Create a stable anon token for this browser session (when user not logged in)."""
     if g.user:
         return None
     if not session.get("anon_id"):
         session["anon_id"] = secrets.token_hex(16)
     return session["anon_id"]
-
 def create_quiz(topic: str, is_daily: bool, items: list[dict]) -> int:
+    """Create a quiz and its items. Returns quiz_id."""
     db = get_db()
     cur = db.execute(
         "INSERT INTO quizzes (topic, is_daily, created_at) VALUES (?, ?, ?)",
@@ -1119,7 +1370,7 @@ def create_quiz(topic: str, is_daily: bool, items: list[dict]) -> int:
             int(it["answer_idx"]),
             it.get("explain") or "",
             it.get("source") or "",
-            (it.get("topic") or topic),
+            (it.get("topic") or topic),   # <= per-item topic
         ))
     db.executemany(
         "INSERT INTO quiz_items (quiz_id, idx, q, choices, answer_idx, explain, source, topic) "
@@ -1129,15 +1380,17 @@ def create_quiz(topic: str, is_daily: bool, items: list[dict]) -> int:
     db.commit()
     return quiz_id
 
+
 def get_daily_quiz_today_id() -> int | None:
+    """Return today's daily quiz id if exists."""
     db = get_db()
     row = db.execute(
         "SELECT id FROM quizzes WHERE is_daily = 1 AND substr(created_at,1,10) = ? ORDER BY id DESC LIMIT 1",
         (today_str(),)
     ).fetchone()
     return row["id"] if row else None
-
 def get_quiz_items_for_template(quiz_id: int) -> list[dict]:
+    """Return items shaped for the Jinja template."""
     db = get_db()
     rows = db.execute(
         "SELECT id, idx, q, choices, answer_idx, explain, source, topic "
@@ -1153,27 +1406,45 @@ def get_quiz_items_for_template(quiz_id: int) -> list[dict]:
             "answer_idx": r["answer_idx"],
             "explain": r["explain"] or "",
             "source": r["source"] or "",
-            "topic": r["topic"] or "",
+            "topic": r["topic"] or "",  # <= expose to Jinja
         })
     return items
-
 def get_or_create_todays_daily(display_topic: str, mix_topics: list[str]) -> int:
+    """
+    Idempotently create today's daily quiz and ALWAYS save 10 items.
+    """
     quiz_id = get_daily_quiz_today_id()
     if quiz_id:
         return quiz_id
+
     items = ensure_ten_mcqs(display_topic, mix_topics, target=10)
     return create_quiz(display_topic, is_daily=True, items=items)
 
+
+
 def record_answer_and_score(quiz_id: int, attempt_id: int, item_idx: int, selected_idx: int):
+    """
+    First-attempt scoring:
+      - +1 if the FIRST selection for this question is correct
+      - +0 if the FIRST selection is wrong
+      - Subsequent selections are ignored (no changes to stored answer or score)
+
+    Returns: (correct: bool, answer_idx: int, new_score: int, explain: str, source: str)
+    """
     db = get_db()
+
+    # Locate the quiz item by index
     item = db.execute(
         "SELECT id, answer_idx, explain, source FROM quiz_items WHERE quiz_id = ? AND idx = ?",
         (quiz_id, item_idx)
     ).fetchone()
     if not item:
         return None, None, None, "", ""
+
     item_id = item["id"]
     correct_answer_idx = int(item["answer_idx"])
+
+    # If already answered, ignore re-tries and return existing state + current score
     existing = db.execute(
         "SELECT selected_idx, correct FROM quiz_answers WHERE attempt_id = ? AND item_id = ?",
         (attempt_id, item_id)
@@ -1184,6 +1455,8 @@ def record_answer_and_score(quiz_id: int, attempt_id: int, item_idx: int, select
             (attempt_id,)
         ).fetchone()["score"]
         return bool(existing["correct"]), correct_answer_idx, int(cur_score), (item["explain"] or ""), (item["source"] or "")
+
+    # First attempt: record the selection
     is_correct = 1 if int(selected_idx) == correct_answer_idx else 0
     db.execute(
         """
@@ -1192,17 +1465,25 @@ def record_answer_and_score(quiz_id: int, attempt_id: int, item_idx: int, select
         """,
         (attempt_id, item_id, int(selected_idx), is_correct, iso_now())
     )
+
+    # If correct on FIRST try, add +1 to score (wrong adds 0)
     if is_correct == 1:
         db.execute("UPDATE quiz_attempts SET score = score + 1 WHERE id = ?", (attempt_id,))
+
     db.commit()
+
+    # Return updated score
     new_score = db.execute(
         "SELECT score FROM quiz_attempts WHERE id = ?",
         (attempt_id,)
     ).fetchone()["score"]
+
     return bool(is_correct), correct_answer_idx, int(new_score), (item["explain"] or ""), (item["source"] or "")
 
 
-# ========= Routes =========
+# =========================
+# Routes
+# =========================
 @app.route("/")
 def index():
     return render_template(
@@ -1211,17 +1492,19 @@ def index():
         title="EPICHECK: AI-Driven Analysis of Youth Health Misinformation and Viral Trends"
     )
 
-# Auth
+# ---------- Auth ----------
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if g.user:
         return redirect(url_for("index"))
+
     error = None
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").lower().strip()
         password = request.form.get("password") or ""
         confirm = request.form.get("confirm") or ""
+
         if not email or not password:
             error = "Email and password are required."
         elif len(password) < 8:
@@ -1239,12 +1522,14 @@ def register():
                 error = "Email already registered."
             except Exception:
                 error = "Registration failed. Try again."
+
     return render_template("register.html", error=error)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if g.user:
         return redirect(url_for("index"))
+
     error = None
     if request.method == "POST":
         email = (request.form.get("email") or "").lower().strip()
@@ -1262,18 +1547,22 @@ def logout():
     session.pop("user_id", None)
     return redirect(url_for("index"))
 
-# Monitor
 @app.route("/monitor", methods=["GET", "POST"])
 @login_required
 def monitor():
     keywords = (request.values.get("keywords") or "").strip()
     selected_sources = request.values.getlist("sources") or ["youtube", "reddit"]
     selected_sources = [s for s in selected_sources if s in ("youtube", "reddit")]
+
     results = {"valid": [], "invalid": [], "uncertain": []}
     sources_used = []
+
     if request.method == "POST" and keywords:
         try:
+            # 1) Run search + AI validation
             results, sources_used = run_monitor_search(keywords, selected_sources)
+
+            # 2) Persist search + posts for this logged-in user
             user_id = g.user["id"]
             search_id = save_monitor_search(
                 keywords,
@@ -1281,12 +1570,16 @@ def monitor():
                 user_id
             )
             save_monitor_posts(search_id, results)
+
+            # 3) Stash in session for quiz fallback, etc.
             session["last_results"] = results
             session["last_keywords"] = keywords
             session["last_search_id"] = search_id
+
         except Exception:
             app.logger.exception("Monitor search failed")
             flash("Search failed. Please try again in a moment.", "danger")
+
     return render_template(
         "monitor.html",
         keywords=keywords,
@@ -1295,45 +1588,60 @@ def monitor():
         now=iso_now(),
         selected_sources=selected_sources
     )
-
-# Quiz
 @app.get("/quiz/daily")
 @login_required
 def quiz_daily():
     db = get_db()
+
+    # Build composite topic and mix list (as you prefer – or keep your earlier function)
     display_topic, mix_topics = composite_topic_for_today(
         g.user["id"] if g.user else None, max_terms=3
     )
+
     quiz_id = get_daily_quiz_today_id()
-    items, points, progress = [], 0, {}
+    items = []
+    points = 0
+    progress = {}
+
     if quiz_id:
         session["active_quiz_id"] = quiz_id
         attempt = get_or_create_attempt(quiz_id)
         points = int(attempt["score"] or 0)
         items = get_quiz_items_for_template(quiz_id)
         progress = get_attempt_progress(quiz_id, attempt["id"])
+
+        # keep original topic if present (so heading is stable)
         row = db.execute("SELECT topic FROM quizzes WHERE id = ?", (quiz_id,)).fetchone()
         if row and row["topic"]:
             display_topic = row["topic"]
+
+    # If no items yet, template will show loader and JS will call /api/quiz/daily to create+hydrate.
     return render_template(
         "quiz.html",
         topic=display_topic,
         items=items,
         points=points,
-        progress_json=json.dumps(progress)
+        progress_json=json.dumps(progress)  # JS will use this to mark answered
     )
+
+
+
 
 @app.route("/quiz/answer", methods=["POST"])
 def quiz_answer():
+    # AJAX endpoint from the quiz page
     try:
         payload = request.get_json(force=True)
-        idx = int(payload.get("idx"))
-        choice = int(payload.get("choice"))
+        idx = int(payload.get("idx"))        # item index (0..9)
+        choice = int(payload.get("choice"))  # selected option
     except Exception:
         return {"ok": False, "error": "Invalid payload"}, 400
+
     quiz_id = session.get("active_quiz_id")
     if not quiz_id:
         return {"ok": False, "error": "No active quiz"}, 400
+
+    # Ensure attempt exists
     attempt = get_or_create_attempt(quiz_id)
     correct, answer_idx, new_score, explain, source = record_answer_and_score(
         quiz_id=quiz_id,
@@ -1343,6 +1651,7 @@ def quiz_answer():
     )
     if answer_idx is None:
         return {"ok": False, "error": "Invalid question index"}, 400
+
     return {
         "ok": True,
         "correct": bool(correct),
@@ -1352,6 +1661,10 @@ def quiz_answer():
         "answer_idx": int(answer_idx),
     }, 200
 
+
+# =========================
+# Simple history & API endpoints
+# =========================
 @app.route("/monitor/history")
 def monitor_history():
     db = get_db()
@@ -1393,24 +1706,29 @@ def api_monitor_posts():
         (search_id,)
     ).fetchall()
     return jsonify([dict(r) for r in rows])
-
 @app.route("/searches/<int:search_id>/delete", methods=["POST"])
 @login_required
 def delete_search(search_id: int):
     db = get_db()
+    # Ensure the search belongs to the current user
     row = db.execute(
         "SELECT id FROM searches WHERE id = ? AND user_id = ?",
         (search_id, g.user["id"])
     ).fetchone()
     if not row:
+        # not found or not owned by this user
         if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"ok": False, "error": "Not found"}), 404
         flash("Search not found.", "warning")
         return redirect(url_for("profile"))
+
+    # Delete (posts will cascade)
     db.execute("DELETE FROM searches WHERE id = ? AND user_id = ?", (search_id, g.user["id"]))
     db.commit()
+
     if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"ok": True}), 200
+
     flash("Search deleted.", "success")
     return redirect(url_for("profile"))
 
@@ -1435,15 +1753,7 @@ def ai_validate(text_for_ai):
             return data
         except Exception:
             pass
-    MISINFO_PATTERNS = [
-        r"detox water|flush toxins|7[- ]day detox",
-        r"raw garlic cures|cure[- ]?all|miracle cure",
-        r"lose \d+\s?(kg|lbs) in \d+\s?(days?|weeks?)",
-        r"spot reduction|melt fat",
-        r"no side effects",
-        r"ozone therapy cures",
-    ]
-    MISINFO_RE = re.compile("|".join(MISINFO_PATTERNS), re.I)
+
     if MISINFO_RE.search(text_for_ai or ""):
         return {
             "verdict": "invalid",
@@ -1465,7 +1775,10 @@ def ai_validate(text_for_ai):
         }
 
 def run_monitor_search(keywords: str, selected_sources: list[str], limit_per_src: int = 10):
+    """Fetch posts from selected sources, validate with AI, and bucket by verdict."""
     posts, sources_used = [], []
+
+    # YouTube
     if "youtube" in selected_sources:
         yt_items = fetch_youtube_search(keywords, limit=min(limit_per_src, 12)) or []
         for it in yt_items:
@@ -1475,13 +1788,17 @@ def run_monitor_search(keywords: str, selected_sources: list[str], limit_per_src
             posts.append(it)
         if yt_items:
             sources_used.append("YouTube")
+
+    # Reddit
     if "reddit" in selected_sources:
         rd_items = fetch_reddit_search(keywords, limit=min(limit_per_src, 12)) or []
         posts.extend(rd_items)
         if rd_items:
             sources_used.append("Reddit")
+
     if not posts:
         return {"valid": [], "invalid": [], "uncertain": []}, sources_used
+
     results = {"valid": [], "invalid": [], "uncertain": []}
     for p in posts:
         text_for_ai = (p.get("text") or "")
@@ -1494,14 +1811,14 @@ def run_monitor_search(keywords: str, selected_sources: list[str], limit_per_src
         p["citations"] = verdict.get("citations", []) or []
         bucket = p["verdict"] if p["verdict"] in results else "uncertain"
         results[bucket].append(p)
-    return results, sources_used
 
-# Profile
+    return results, sources_used
 @app.route("/profile")
 @login_required
 def profile():
     db = get_db()
     user_id = g.user["id"]
+
     attempts = db.execute(
         """
         SELECT
@@ -1522,6 +1839,7 @@ def profile():
         """,
         (user_id,)
     ).fetchall()
+
     stats = db.execute(
         """
         SELECT
@@ -1534,6 +1852,7 @@ def profile():
         """,
         (user_id,)
     ).fetchone() or {"total_quizzes": 0, "avg_score": 0, "best_score": 0, "last_active": None}
+
     searches = db.execute(
         """
         SELECT s.id, s.keywords, s.sources, s.created_at,
@@ -1549,6 +1868,7 @@ def profile():
         """,
         (user_id,)
     ).fetchall()
+
     per_topic = db.execute(
         """
         SELECT qi.topic,
@@ -1564,6 +1884,7 @@ def profile():
         """,
         (user_id,)
     ).fetchall()
+
     return render_template(
         "profile.html",
         is_guest=False,
@@ -1571,27 +1892,35 @@ def profile():
         stats=dict(stats),
         attempts=[dict(r) for r in attempts],
         searches=[dict(r) for r in searches],
-        per_topic=[dict(r) for r in per_topic],
+        per_topic=[dict(r) for r in per_topic],  # <- pass to template if you want to render
     )
 
-# Legacy Campaign helpers/routes (kept for compatibility)
+# ---------- Campaign helpers ----------
 SLUG_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
-def _legacy_slug(n=8):
+
+def _slug(n=8):
     return "".join(random.choice(SLUG_ALPHABET) for _ in range(n))
 
-def _legacy_unique_slug():
+def _unique_slug():
     db = get_db()
     for _ in range(8):
-        s = _legacy_slug()
+        s = _slug()
         row = db.execute("SELECT 1 FROM campaigns WHERE slug = ?", (s,)).fetchone()
         if not row:
             return s
-    return _legacy_slug() + str(int(time.time()))
+    # extreme fallback: timestamped slug
+    return _slug() + str(int(time.time()))
 
 def _iso_date_utc(d: datetime) -> str:
     return d.astimezone(timezone.utc).date().isoformat()
 
+def _first_monday_on_or_after(d: datetime) -> datetime:
+    # align to next Monday for weekly cadence (club-friendly)
+    wd = d.weekday()  # Mon=0
+    return d if wd == 0 else d + timedelta(days=(7 - wd))
+
 def _safe_sources_from_monitor(topic: str, max_urls=4):
+    """Pull credible sources from session last_results or fallback to allowed domains."""
     urls = []
     last = session.get("last_results") or {}
     for bucket in ("valid", "uncertain", "invalid"):
@@ -1606,21 +1935,39 @@ def _safe_sources_from_monitor(topic: str, max_urls=4):
         if len(urls) >= max_urls:
             break
     if not urls:
+        # generic fallbacks tied to topic
         urls = [
             f"https://medlineplus.gov/search/?query={requests.utils.quote(topic)}",
             "https://www.cdc.gov/healthyliving/index.htm",
             "https://www.nih.gov/health-information",
         ]
+    # de-dupe while keeping order
     return list(dict.fromkeys(urls))[:max_urls]
+from datetime import timedelta
 
 def generate_weekly_plan(topic: str, audience: str, weeks: int = 4) -> list[dict]:
+    """
+    Poster-only plan.
+    Each week gets one poster that teaches:
+      - Common false knowledge (myths)
+      - Evidence-based facts
+      - How to check claims
+      - Red flags to watch for
+      - A small teen-specific note
+    Stored as Markdown in `body` so templates can render immediately.
+    """
     subs = [
         "common myths", "warning signs", "benefits vs. risks", "reliability of sources",
         "interactions/contraindications", "age-specific considerations", "dosage and limits",
         "online misinformation tactics", "overhyped benefits", "peer pressure and trends"
     ]
+
+    is_school = (audience == "school_club")  # reserved for later copy tweaks
     sources = _safe_sources_from_monitor(topic)
+
     def poster_body_for_week(week_no: int, subtheme: str) -> str:
+        # Tight, poster-ready sections. Keep it generic but useful for any topic.
+        # Use short lines so it looks clean in the UI.
         return textwrap.dedent(f"""
         ## Poster — {topic.title()} ({subtheme.title()})
 
@@ -1655,6 +2002,7 @@ def generate_weekly_plan(topic: str, audience: str, weeks: int = 4) -> list[dict
         ### Credible Starting Points
         {chr(10).join(f"- {u}" for u in sources)}
         """).strip()
+
     plan = []
     for w in range(1, weeks + 1):
         sub = random.choice(subs)
@@ -1666,144 +2014,12 @@ def generate_weekly_plan(topic: str, audience: str, weeks: int = 4) -> list[dict
             "sources": sources,
         })
     return plan
-
-def persist_campaign(user_id: int, title: str, topic: str, audience: str, visibility: str, starts_on: str, weeks: int, plan: list[dict]) -> int:
-    db = get_db()
-    slug = _legacy_unique_slug()
-    db.execute(
-        "INSERT INTO campaigns (user_id, title, topic, audience, visibility, starts_on, weeks, created_at, slug) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (user_id, title, topic, audience, visibility, starts_on, weeks, iso_now(), slug)
-    )
-    cid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-    rows = []
-    for item in plan:
-        rows.append((
-            cid,
-            int(item["week_no"]),
-            item["content_type"],
-            item["title"],
-            item["body"],
-            json.dumps(item.get("sources") or [], ensure_ascii=False),
-            iso_now()
-        ))
-    db.executemany(
-        "INSERT INTO campaign_items (campaign_id, week_no, content_type, title, body, sources, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        rows
-    )
-    db.commit()
-    return cid
-
-@app.route("/campaigns")
-@login_required
-def campaigns_index():
-    db = get_db()
-    rows = db.execute(
-        "SELECT id, title, topic, audience, visibility, starts_on, weeks, slug, created_at "
-        "FROM campaigns WHERE user_id = ? ORDER BY id DESC",
-        (g.user["id"],)
-    ).fetchall()
-    return render_template("campaigns/index.html", rows=[dict(r) for r in rows])
-
-@app.route("/campaigns/new", methods=["GET", "POST"])
-@login_required
-def campaigns_new():
-    error = None
-    if request.method == "POST":
-        title = (request.form.get("title") or "").strip()
-        topic = (request.form.get("topic") or "").strip()
-        audience = (request.form.get("audience") or "school_club").strip()
-        visibility = (request.form.get("visibility") or "public").strip()
-        weeks = int(request.form.get("weeks") or 4)
-        starts_on = (request.form.get("starts_on") or "").strip()
-        if not title or not topic:
-            error = "Title and topic are required."
-        else:
-            if not starts_on:
-                now_local = datetime.now(ZoneInfo(APP_TZ))
-                starts_on = _iso_date_utc(_first_monday_on_or_after(now_local))
-            try:
-                plan = generate_weekly_plan(topic=topic, audience=audience, weeks=weeks)
-                cid = persist_campaign(
-                    user_id=g.user["id"],
-                    title=title,
-                    topic=topic,
-                    audience=audience,
-                    visibility=visibility,
-                    starts_on=starts_on,
-                    weeks=weeks,
-                    plan=plan
-                )
-                return redirect(url_for("campaigns_view", campaign_id=cid))
-            except Exception:
-                app.logger.exception("Failed to create campaign")
-                error = "Failed to create campaign. Please try again."
-    return render_template("campaigns/new.html", error=error, today=date.today().isoformat())
-
-@app.route("/campaigns/<int:campaign_id>")
-@login_required
-def campaigns_view(campaign_id: int):
-    db = get_db()
-    camp = db.execute(
-        "SELECT * FROM campaigns WHERE id = ? AND user_id = ?",
-        (campaign_id, g.user["id"])
-    ).fetchone()
-    if not camp:
-        flash("Campaign not found.", "warning")
-        return redirect(url_for("campaigns_index"))
-    items = db.execute(
-        "SELECT week_no, content_type, title, body, sources, created_at "
-        "FROM campaign_items WHERE campaign_id = ? ORDER BY week_no, id",
-        (campaign_id,)
-    ).fetchall()
-    by_week = {}
-    for r in items:
-        wk = int(r["week_no"])
-        by_week.setdefault(wk, []).append({
-            "content_type": r["content_type"],
-            "title": r["title"],
-            "body": r["body"],
-            "sources": json.loads(r["sources"] or "[]"),
-            "created_at": r["created_at"],
-        })
-    return render_template("campaigns/view.html", campaign=dict(camp), weeks=by_week)
-
-@app.route("/c/<slug>")
-def campaigns_public(slug: str):
-    db = get_db()
-    camp = db.execute(
-        "SELECT * FROM campaigns WHERE slug = ?",
-        (slug,)
-    ).fetchone()
-    if not camp:
-        flash("Campaign not found.", "warning")
-        return redirect(url_for("index"))
-    if camp["visibility"] != "public":
-        flash("This campaign is private.", "warning")
-        return redirect(url_for("index"))
-    items = db.execute(
-        "SELECT week_no, content_type, title, body, sources "
-        "FROM campaign_items WHERE campaign_id = ? ORDER BY week_no, id",
-        (camp["id"],)
-    ).fetchall()
-    by_week = {}
-    for r in items:
-        wk = int(r["week_no"])
-        by_week.setdefault(wk, []).append({
-            "content_type": r["content_type"],
-            "title": r["title"],
-            "body": r["body"],
-            "sources": json.loads(r["sources"] or "[]"),
-        })
-    return render_template("campaigns/public.html", campaign=dict(camp), weeks=by_week)
-
-
-# ========= Quiz API =========
 @app.post("/api/quiz/generate")
 def api_quiz_generate():
     data = request.get_json(force=True, silent=True) or {}
     topic = (data.get("topic") or "").strip()
+
+    # Compose default composite topic if none provided
     if not topic:
         display_topic, mix_topics = composite_topic_for_today(
             g.user["id"] if g.user else None, max_terms=3
@@ -1811,29 +2027,40 @@ def api_quiz_generate():
         topic = display_topic
     else:
         mix_topics = [t.strip() for t in topic.split(",") if t.strip()]
+
+    # 1) GPT on the (possibly composite) topic
     items = gpt_generate_mcqs(topic, n_questions=10)
+
+    # 2) Retry GPT on the broader mix if short
     if len(items) < 10 and mix_topics:
         broader_topic = ", ".join(mix_topics) or topic
         more = gpt_generate_mcqs(broader_topic, n_questions=10)
         items = ensure_unique_items(items + more, topic="__mixed__")
+
+    # 3) OSS fallback using trusted sources
     if len(items) < 10:
         contexts = fetch_trusted_pages(get_trusted_sources_from_session_fallback(topic))
         more = oss_generate_mcqs(topic, contexts) or []
         items = ensure_unique_items(items + more, topic="__mixed__")
+
     if len(items) < 10 and mix_topics:
         broader_topic = ", ".join(mix_topics) or topic
         contexts = fetch_trusted_pages(get_trusted_sources_from_session_fallback(broader_topic))
         more = oss_generate_mcqs(broader_topic, contexts) or []
         items = ensure_unique_items(items + more, topic="__mixed__")
+
     items = ensure_ten_mcqs(topic, mix_topics, target=10)
+
     quiz_id = create_quiz(topic, is_daily=False, items=items)
     session["active_quiz_id"] = quiz_id
     attempt = get_or_create_attempt(quiz_id)
     points = int(attempt["score"] or 0)
     items_out = get_quiz_items_for_template(quiz_id)
+
     return {"ok": True, "quiz_id": quiz_id, "points": points, "items": items_out}
 
 def get_or_create_attempt(quiz_id: int):
+    """Return attempt row (create if needed) for current user/anon."""
     db = get_db()
     if g.user:
         row = db.execute(
@@ -1870,14 +2097,17 @@ def api_quiz_daily():
         quiz_id = get_or_create_todays_daily(display_topic, mix_topics)
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
+
     session["active_quiz_id"] = quiz_id
     attempt = get_or_create_attempt(quiz_id)
     points = int(attempt["score"] or 0)
     items = get_quiz_items_for_template(quiz_id)
     progress = get_attempt_progress(quiz_id, attempt["id"])
+
     db = get_db()
     row = db.execute("SELECT topic FROM quizzes WHERE id = ?", (quiz_id,)).fetchone()
     final_topic = row["topic"] if row and row["topic"] else display_topic
+
     return {
         "ok": True,
         "quiz_id": quiz_id,
@@ -1888,11 +2118,157 @@ def api_quiz_daily():
     }
 
 
-# ========= Main =========
+
+def persist_campaign(user_id: int, title: str, topic: str, audience: str, visibility: str, starts_on: str, weeks: int, plan: list[dict]) -> int:
+    db = get_db()
+    slug = _unique_slug()
+    db.execute(
+        "INSERT INTO campaigns (user_id, title, topic, audience, visibility, starts_on, weeks, created_at, slug) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, title, topic, audience, visibility, starts_on, weeks, iso_now(), slug)
+    )
+    cid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    rows = []
+    for item in plan:
+        rows.append((
+            cid,
+            int(item["week_no"]),
+            item["content_type"],
+            item["title"],
+            item["body"],
+            json.dumps(item.get("sources") or [], ensure_ascii=False),
+            iso_now()
+        ))
+    db.executemany(
+        "INSERT INTO campaign_items (campaign_id, week_no, content_type, title, body, sources, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        rows
+    )
+    db.commit()
+    return cid
+# ---------- Campaign routes ----------
+from datetime import date
+
+@app.route("/campaigns")
+@login_required
+def campaigns_index():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, title, topic, audience, visibility, starts_on, weeks, slug, created_at "
+        "FROM campaigns WHERE user_id = ? ORDER BY id DESC",
+        (g.user["id"],)
+    ).fetchall()
+    return render_template("campaigns/index.html", rows=[dict(r) for r in rows])
+
+@app.route("/campaigns/new", methods=["GET", "POST"])
+@login_required
+def campaigns_new():
+    error = None
+    if request.method == "POST":
+        title = (request.form.get("title") or "").strip()
+        topic = (request.form.get("topic") or "").strip()
+        audience = (request.form.get("audience") or "school_club").strip()
+        visibility = (request.form.get("visibility") or "public").strip()
+        weeks = int(request.form.get("weeks") or 4)
+        starts_on = (request.form.get("starts_on") or "").strip()
+
+        if not title or not topic:
+            error = "Title and topic are required."
+        else:
+            # default start: next Monday in APP_TZ
+            if not starts_on:
+                now_local = datetime.now(ZoneInfo(APP_TZ))
+                starts_on = _iso_date_utc(_first_monday_on_or_after(now_local))
+            try:
+                plan = generate_weekly_plan(topic=topic, audience=audience, weeks=weeks)
+                cid = persist_campaign(
+                    user_id=g.user["id"],
+                    title=title,
+                    topic=topic,
+                    audience=audience,
+                    visibility=visibility,
+                    starts_on=starts_on,
+                    weeks=weeks,
+                    plan=plan
+                )
+                return redirect(url_for("campaigns_view", campaign_id=cid))
+            except Exception:
+                app.logger.exception("Failed to create campaign")
+                error = "Failed to create campaign. Please try again."
+
+    # GET: render form
+    return render_template("campaigns/new.html", error=error, today=date.today().isoformat())
+
+@app.route("/campaigns/<int:campaign_id>")
+@login_required
+def campaigns_view(campaign_id: int):
+    db = get_db()
+    camp = db.execute(
+        "SELECT * FROM campaigns WHERE id = ? AND user_id = ?",
+        (campaign_id, g.user["id"])
+    ).fetchone()
+    if not camp:
+        flash("Campaign not found.", "warning")
+        return redirect(url_for("campaigns_index"))
+
+    items = db.execute(
+        "SELECT week_no, content_type, title, body, sources, created_at "
+        "FROM campaign_items WHERE campaign_id = ? ORDER BY week_no, id",
+        (campaign_id,)
+    ).fetchall()
+
+    # Group by week
+    by_week = {}
+    for r in items:
+        wk = int(r["week_no"])
+        by_week.setdefault(wk, []).append({
+            "content_type": r["content_type"],
+            "title": r["title"],
+            "body": r["body"],
+            "sources": json.loads(r["sources"] or "[]"),
+            "created_at": r["created_at"],
+        })
+
+    return render_template("campaigns/view.html", campaign=dict(camp), weeks=by_week)
+
+@app.route("/c/<slug>")
+def campaigns_public(slug: str):
+    """Public read-only page for sharing."""
+    db = get_db()
+    camp = db.execute(
+        "SELECT * FROM campaigns WHERE slug = ?",
+        (slug,)
+    ).fetchone()
+    if not camp:
+        flash("Campaign not found.", "warning")
+        return redirect(url_for("index"))
+    if camp["visibility"] != "public":
+        flash("This campaign is private.", "warning")
+        return redirect(url_for("index"))
+
+    items = db.execute(
+        "SELECT week_no, content_type, title, body, sources "
+        "FROM campaign_items WHERE campaign_id = ? ORDER BY week_no, id",
+        (camp["id"],)
+    ).fetchall()
+
+    by_week = {}
+    for r in items:
+        wk = int(r["week_no"])
+        by_week.setdefault(wk, []).append({
+            "content_type": r["content_type"],
+            "title": r["title"],
+            "body": r["body"],
+            "sources": json.loads(r["sources"] or "[]"),
+        })
+
+    return render_template("campaigns/public.html", campaign=dict(camp), weeks=by_week)
+
+
+# =========================
+# Main
+# =========================
 if __name__ == "__main__":
-    # Make sure you have:
-    # - OPENAI_API_KEY (and optionally OPENAI_IMAGE_MODEL, OPENAI_MODEL)
-    # - YT_API_KEY (optional for YouTube API; RSS fallback is used otherwise)
-    # - templates/* (including studio/ and campaigns/ views)
-    # - static/posters/ directory (auto-created)
+    # Never hardcode API keys; set OPENAI_API_KEY and YT_API_KEY in your environment
     app.run(debug=True)

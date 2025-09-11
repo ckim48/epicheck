@@ -1,0 +1,190 @@
+<!-- templates/studio/index.html -->
+{% extends "nav.html" %}
+{% block title %}Poster Studio{% endblock %}
+{% block content %}
+
+<style>
+/* =========================
+   Light Theme Tokens
+========================= */
+:root{
+  --surface:      #f8fafc; /* light background */
+  --card:         #ffffff;
+  --card-border:  #e3e8ef;
+  --ink:          #1e293b; /* main text */
+  --muted:        #64748b; /* secondary text */
+
+  /* Accent colors for highlights */
+  --accent:       #4f46e5;
+  --accent-light: #818cf8;
+
+  /* Chip badge gradients */
+  --chip-public-a:  #34d399;
+  --chip-public-b:  #059669;
+  --chip-private-a: #c084fc;
+  --chip-private-b: #7c3aed;
+}
+
+/* Page background */
+body{
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Header muted text */
+.text-muted{ color: var(--muted) !important; }
+
+/* Create button */
+.btn-new{
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  color: #fff;
+  border: 0;
+  border-radius: .75rem;
+  padding: .6rem 1rem;
+  font-weight: 600;
+  display: inline-flex; align-items: center;
+  text-decoration: none;
+  transition: transform .15s ease, filter .15s ease;
+}
+.btn-new:hover{ transform: translateY(-2px); filter: brightness(1.05); }
+.btn-new:active{ transform: translateY(0); }
+
+/* Card Layout */
+.card-link{ text-decoration: none; }
+.pc-card{
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  min-height: 180px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 .25rem .75rem rgba(0,0,0,.05);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.pc-card:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.08);
+  border-color: var(--accent-light);
+}
+
+.pc-card-top{
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: .5rem;
+}
+.meta{ color: var(--muted); font-size: .9rem; }
+
+/* Title & topic */
+.pc-title{
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: .25rem 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pc-sub{
+  color: var(--muted);
+  font-size: .9rem;
+  margin: 0 0 .5rem;
+}
+
+/* Bottom area */
+.pc-card-btm{
+  margin-top: auto;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.pulse{
+  width: .55rem; height: .55rem; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 .65rem .15rem rgba(79,70,229,.4);
+}
+.open{ color: var(--muted); font-size: .88rem; }
+
+/* Chip badges */
+.chip{
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-weight: 600; font-size: .78rem;
+  padding: .3rem .55rem;
+  border-radius: 999px;
+  color: #fff;
+}
+.chip-public{
+  background: linear-gradient(135deg, var(--chip-public-a), var(--chip-public-b));
+}
+.chip-private{
+  background: linear-gradient(135deg, var(--chip-private-a), var(--chip-private-b));
+}
+.chip i{ font-size: .85em; }
+
+/* Empty state */
+.glass{
+  background: #fff;
+  border: 1px dashed var(--card-border);
+  border-radius: 1rem;
+}
+.empty{ text-align: center; padding: 3rem 1rem; }
+.icon-wrap{
+  width: 64px; height: 64px; margin: 0 auto 12px;
+  background: var(--accent-light);
+  color: #fff;
+  border-radius: 16px;
+  display: grid; place-items: center;
+  font-size: 1.8rem;
+}
+</style>
+
+<section class="container py-4">
+
+  <!-- Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="h4 mb-1 fw-bold">Poster Campaign Studio</h1>
+      <p class="text-muted mb-0">Create, track, and share your campaigns.</p>
+    </div>
+    <a class="btn-new" href="{{ url_for('studio.studio_new') }}">
+      <i class="bi bi-plus-lg me-1"></i> New Campaign
+    </a>
+  </div>
+
+  {% if rows and rows|length > 0 %}
+    <div class="row g-3 g-md-4">
+      {% for c in rows %}
+      <div class="col-12 col-sm-6 col-xl-4">
+        <a class="card-link" href="{{ url_for('studio.studio_view', campaign_id=c.id) }}">
+          <article class="pc-card">
+            <header class="pc-card-top">
+              <span class="chip {{ 'chip-public' if c.visibility=='public' else 'chip-private' }}">
+                <i class="bi {{ 'bi-globe2' if c.visibility=='public' else 'bi-shield-lock' }}"></i>
+                {{ c.visibility|capitalize }}
+              </span>
+              <span class="meta"><i class="bi bi-calendar-event me-1"></i>{{ c.starts_on }}</span>
+            </header>
+
+            <h2 class="pc-title">{{ c.title }}</h2>
+            <p class="pc-sub">
+              <i class="bi bi-tag me-1"></i>{{ c.topic }} • {{ c.weeks }} weeks
+            </p>
+
+            <footer class="pc-card-btm">
+              <span class="pulse"></span>
+              <span class="open">Open <i class="bi bi-arrow-up-right ms-1"></i></span>
+            </footer>
+          </article>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty glass">
+      <div class="empty-body">
+        <div class="icon-wrap"><i class="bi bi-postcard"></i></div>
+        <h2 class="h5 fw-semibold mb-1">No poster campaigns yet</h2>
+        <p class="text-muted mb-4">Start your first campaign to plan assets and schedule weeks.</p>
+        <a class="btn-new" href="{{ url_for('studio.studio_new') }}">
+          <i class="bi bi-plus-lg me-1"></i>Create your first campaign
+        </a>
+      </div>
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}

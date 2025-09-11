@@ -1,0 +1,106 @@
+<!-- templates/studio/public.html -->
+{% extends "nav.html" %}
+{% block title %}{{ campaign.title }} • Posters{% endblock %}
+{% block content %}
+
+<style>
+/* =========================
+   Light Theme Tokens (shared)
+========================= */
+:root{
+  --surface:      #f8fafc;   /* page background */
+  --card:         #ffffff;   /* card background */
+  --card-border:  #e3e8ef;
+  --ink:          #1e293b;   /* primary text */
+  --muted:        #64748b;   /* secondary text */
+  --accent:       #4f46e5;
+  --accent-2:     #818cf8;
+}
+
+body{ background: var(--surface); color: var(--ink); }
+.text-muted{ color: var(--muted) !important; }
+
+/* Header */
+.public-header{
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.public-header h1{
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+.public-header p{
+  color: var(--muted);
+  margin-top: .25rem;
+}
+
+/* Poster grid */
+.poster-card{
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 .25rem .75rem rgba(0,0,0,.06);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  display: block;
+}
+.poster-card:hover{
+  transform: translateY(-3px);
+  border-color: var(--accent-2);
+  box-shadow: 0 .5rem 1.25rem rgba(0,0,0,.08);
+}
+.poster-card img{
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #f1f5f9;
+}
+
+/* Empty state */
+.empty{
+  background: var(--card);
+  border: 1px dashed var(--card-border);
+  border-radius: 1rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+.empty .icon{
+  width: 64px; height: 64px;
+  margin: 0 auto 12px;
+  display: grid; place-items: center;
+  background: var(--accent-2);
+  color: #fff;
+  border-radius: 16px;
+  font-size: 1.8rem;
+}
+</style>
+
+<div class="container my-4">
+
+  <!-- Header -->
+  <div class="public-header">
+    <h1>{{ campaign.title }}</h1>
+    <p>{{ campaign.topic }} • {{ campaign.audience|replace('_',' ')|title }}</p>
+  </div>
+
+  <!-- Posters grid -->
+  <div class="row g-3">
+    {% for p in posters %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <a href="/{{ p.img_path }}" target="_blank" class="poster-card">
+          <img src="/{{ p.img_path }}" alt="poster">
+        </a>
+      </div>
+    {% else %}
+      <div class="col-12">
+        <div class="empty">
+          <div class="icon"><i class="bi bi-image"></i></div>
+          <div>No posters published yet.</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
