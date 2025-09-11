@@ -175,18 +175,18 @@ body{ background: var(--surface); color: var(--ink); }
       <h2 class="h4 mb-1">{{ campaign.title }} <span class="pulse"></span></h2>
       <small class="text-muted">{{ campaign.topic }} • {{ campaign.audience|replace('_',' ')|title }}</small>
     </div>
-    <a class="btn-ghost" target="_blank"
-       href="{{ url_for('studio.studio_public', slug=campaign.slug) }}">
-      Public page
-    </a>
+<a class="btn-ghost" target="_blank"
+   href="{{ url_for('studio_public', slug=campaign.slug) }}">
+  Public page
+</a>
   </div>
 
   <div class="hr-soft"></div>
 
   <!-- Generate form -->
 <div class="form-wrap mb-3">
-  <form id="genForm" method="post" action="{{ url_for('studio.studio_generate') }}" class="row g-3 align-items-end">
-    <input type="hidden" name="campaign_id" value="{{ campaign.id }}">
+<form id="genForm" method="post" action="{{ url_for('studio_generate') }}" class="row g-3 align-items-end">
+  <input type="hidden" name="campaign_id" value="{{ campaign.id }}">
 
       <div class="col-md-1">
         <label class="form-label">Week #</label>
@@ -260,7 +260,7 @@ body{ background: var(--surface); color: var(--ink); }
     // Show overlay immediately (before navigation)
     overlay.classList.add('show');
     overlay.setAttribute('aria-hidden', 'false');
-
+    console.log("called");
     // IMPORTANT: don't disable inputs here; disabled fields are not submitted.
     // If you want to block extra clicks, only disable the button:
     if (button){

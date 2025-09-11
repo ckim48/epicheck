@@ -774,7 +774,6 @@ def generate_poster_png(topic: str, subtheme: str, audience: str, seed: str | No
 
 
 # ========= Studio blueprint =========
-studio = Blueprint("studio", __name__, template_folder="templates")
 
 SLUG_ALPH = "abcdefghjkmnpqrstuvwxyz23456789"
 def _slug(n=8):
@@ -792,7 +791,8 @@ def _first_monday_on_or_after(d: datetime) -> datetime:
     wd = d.weekday()
     return d if wd == 0 else d + timedelta(days=(7 - wd))
 
-@studio.route("/studio")
+@app.route("/studio")
+@login_required
 def studio_home():
     if not g.user:
         return redirect(url_for("login", next=request.path))
@@ -804,7 +804,8 @@ def studio_home():
     ).fetchall()
     return render_template("studio/index.html", rows=[dict(r) for r in rows])
 
-@studio.route("/studio/new", methods=["GET","POST"])
+@app.route("/studio/new", methods=["GET","POST"])
+@login_required
 def studio_new():
     if not g.user:
         return redirect(url_for("login", next=request.path))
@@ -837,7 +838,8 @@ def studio_new():
                 error = "Failed to create."
     return render_template("studio/new.html", error=error)
 
-@studio.route("/studio/c/<int:campaign_id>")
+@app.route("/studio/c/<int:campaign_id>")
+@login_required
 def studio_view(campaign_id: int):
     if not g.user:
         return redirect(url_for("login", next=request.path))
@@ -855,10 +857,12 @@ def studio_view(campaign_id: int):
     ).fetchall()
     return render_template("studio/view.html", campaign=dict(camp), posters=[dict(p) for p in posters])
 
-@studio.route("/studio/generate", methods=["POST"])
+@app.route("/studio/generate", methods=["POST"])
+@login_required
 def studio_generate():
-    if not g.user:
-        abort(403)
+    # if not g.user:
+    #     abort(403)
+    print("Called A")
     db = get_db()
     campaign_id = int(request.form.get("campaign_id") or 0)
     week_no     = int(request.form.get("week_no") or 1)
@@ -866,18 +870,18 @@ def studio_generate():
     seed        = (request.form.get("seed") or "").strip() or None
     w           = int(request.form.get("w") or 1024)
     h           = int(request.form.get("h") or 1536)
-
+    print("Called B")
     camp = db.execute(
         "SELECT id, topic, audience FROM poster_campaigns WHERE id=? AND user_id=?",
         (campaign_id, g.user["id"])
     ).fetchone()
-    if not camp:
-        abort(404)
+    print("Called C")
 
     abs_path, name = generate_poster_png(
         topic=camp["topic"], subtheme=subtheme, audience=camp["audience"],
         seed=seed, width=w, height=h
     )
+    print("Called D")
     rel_path = f"static/posters/{name}"
     prompt_used = f"{camp['topic']} — {subtheme} — {camp['audience']}"
     db.execute(
@@ -885,6 +889,7 @@ def studio_generate():
         "VALUES (?,?,?,?,?,?,?,?)",
         (campaign_id, week_no, prompt_used, rel_path, seed, w, h, iso_now())
     )
+    print("Called E")
     db.commit()
     return redirect(url_for("studio.studio_view", campaign_id=campaign_id))
 
@@ -936,7 +941,7 @@ def get_youtube_transcript(video_id: str, max_chars: int = 4000) -> str | None:
         return None
 
 
-@studio.route("/p/<slug>")
+@app.route("/p/<slug>")
 def studio_public(slug: str):
     db = get_db()
     camp = db.execute("SELECT * FROM poster_campaigns WHERE slug=?", (slug,)).fetchone()
@@ -953,8 +958,6 @@ def studio_public(slug: str):
                            campaign=dict(camp),
                            posters=[dict(p) for p in posters])
 
-# Register blueprint
-app.register_blueprint(studio)
 
 
 # ========= Monitoring (YouTube/Reddit) =========
