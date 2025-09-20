@@ -130,6 +130,27 @@ body{
   display: grid; place-items: center;
   font-size: 1.8rem;
 }
+  /* Admin delete button */
+.admin-delete{
+  position:absolute; top:45px; right:8px; z-index:2;
+}
+.admin-delete .btn-del{
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.35rem .55rem; border-radius:.5rem;
+  border:1px solid var(--card-border); background:#fff; color:#dc2626; /* red text */
+  font-weight:700; font-size:.85rem;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.admin-delete .btn-del:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 .35rem .9rem rgba(0,0,0,.08);
+  border-color:#fda4af;
+}
+@media (prefers-color-scheme: dark){
+  .admin-delete .btn-del{ background:#0b1220; border-color:#1f2937; color:#fca5a5; }
+  .admin-delete .btn-del:hover{ border-color:#f87171; }
+}
+
 </style>
 
 <section class="container py-4">
@@ -140,38 +161,53 @@ body{
       <h1 class="h4 mb-1 fw-bold">Poster Campaign Studio</h1>
       <p class="text-muted mb-0">Create, track, and share your campaigns.</p>
     </div>
-    <a class="btn-new" href="{{ url_for('studio.studio_new') }}">
+    <a class="btn-new" href="{{ url_for('studio_new') }}">
       <i class="bi bi-plus-lg me-1"></i> New Campaign
     </a>
   </div>
 
   {% if rows and rows|length > 0 %}
     <div class="row g-3 g-md-4">
-      {% for c in rows %}
-      <div class="col-12 col-sm-6 col-xl-4">
-        <a class="card-link" href="{{ url_for('studio.studio_view', campaign_id=c.id) }}">
-          <article class="pc-card">
-            <header class="pc-card-top">
-              <span class="chip {{ 'chip-public' if c.visibility=='public' else 'chip-private' }}">
-                <i class="bi {{ 'bi-globe2' if c.visibility=='public' else 'bi-shield-lock' }}"></i>
-                {{ c.visibility|capitalize }}
-              </span>
-              <span class="meta"><i class="bi bi-calendar-event me-1"></i>{{ c.starts_on }}</span>
-            </header>
+     {% for c in rows %}
+<div class="col-12 col-sm-6 col-xl-4">
+  <div class="position-relative">
+    {% if is_admin %}
+      <form class="admin-delete"
+            method="post"
+            action="{{ url_for('admin_delete_poster_campaign', campaign_id=c.id) }}"
+            onsubmit="event.stopPropagation(); return confirm('Delete this poster campaign and all its posters?');">
+        <button type="submit" class="btn-del" title="Delete"
+                onclick="event.stopPropagation();">
+          <i class="bi bi-trash"></i> Delete
+        </button>
+      </form>
+    {% endif %}
 
-            <h2 class="pc-title">{{ c.title }}</h2>
-            <p class="pc-sub">
-              <i class="bi bi-tag me-1"></i>{{ c.topic }} • {{ c.weeks }} weeks
-            </p>
+    <a class="card-link" href="{{ url_for('studio_view', campaign_id=c.id) }}">
+      <article class="pc-card">
+        <header class="pc-card-top">
+          <span class="chip {{ 'chip-public' if c.visibility=='public' else 'chip-private' }}">
+            <i class="bi {{ 'bi-globe2' if c.visibility=='public' else 'bi-shield-lock' }}"></i>
+            {{ c.visibility|capitalize }}
+          </span>
+          <span class="meta"><i class="bi bi-calendar-event me-1"></i>{{ c.starts_on }}</span>
+        </header>
 
-            <footer class="pc-card-btm">
-              <span class="pulse"></span>
-              <span class="open">Open <i class="bi bi-arrow-up-right ms-1"></i></span>
-            </footer>
-          </article>
-        </a>
-      </div>
-      {% endfor %}
+        <h2 class="pc-title">{{ c.title }}</h2>
+        <p class="pc-sub">
+          <i class="bi bi-tag me-1"></i>{{ c.topic }} • {{ c.weeks }} weeks
+        </p>
+
+        <footer class="pc-card-btm">
+          <span class="pulse"></span>
+          <span class="open">Open <i class="bi bi-arrow-up-right ms-1"></i></span>
+        </footer>
+      </article>
+    </a>
+  </div>
+</div>
+{% endfor %}
+
     </div>
   {% else %}
     <div class="empty glass">
@@ -179,7 +215,7 @@ body{
         <div class="icon-wrap"><i class="bi bi-postcard"></i></div>
         <h2 class="h5 fw-semibold mb-1">No poster campaigns yet</h2>
         <p class="text-muted mb-4">Start your first campaign to plan assets and schedule weeks.</p>
-        <a class="btn-new" href="{{ url_for('studio.studio_new') }}">
+        <a class="btn-new" href="{{ url_for('studio_new') }}">
           <i class="bi bi-plus-lg me-1"></i>Create your first campaign
         </a>
       </div>

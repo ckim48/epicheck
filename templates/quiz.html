@@ -180,6 +180,97 @@ h2.page-title{
   font-size:.85rem; color: var(--muted);
 }
 .q-progress .meta strong { color: var(--ink); }
+/* ---------- Quiz Completion Modal ---------- */
+#quizDoneModal .modal-dialog {
+  max-width: 420px;
+  margin: auto;
+}
+
+#quizDoneModal .modal-content.glass {
+  background: var(--glass);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,.35);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.15);
+  overflow: hidden;
+  animation: popUp 0.25s ease-out;
+}
+
+@keyframes popUp {
+  from { transform: scale(.92); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+#quizDoneModal .modal-hero {
+  padding: 22px 24px 18px;
+  background: linear-gradient(135deg, rgba(96,165,250,.15), rgba(167,139,250,.15));
+  border-bottom: 1px solid var(--line);
+}
+
+#quizDoneModal .modal-hero h5 {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+#quizDoneModal .modal-hero p {
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+#quizDoneModal .icon-chip {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:44px;
+  margin-right:14px;
+  border-radius:50%;
+  background:rgba(255,255,255,.8);
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
+}
+@media (prefers-color-scheme: dark){
+  #quizDoneModal .icon-chip {
+    background:rgba(15,23,42,.6);
+  }
+}
+
+#quizDoneModal .icon-chip i {
+  font-size:1.4rem;
+  color:#facc15;
+}
+
+
+#quizDoneModal .modal-body.modern {
+  padding: 20px 24px;
+  color: var(--ink);
+}
+
+
+#quizDoneModal .modal-footer.modern {
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+
+#quizDoneModal .q-progress .track {
+  height: 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid var(--line);
+}
+@media (prefers-color-scheme: dark){
+  #quizDoneModal .q-progress .track {
+    background: #0f172a;
+  }
+}
+
+#quizDoneModal .q-progress .bar {
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+}
 
 </style>
 {% endblock %}
@@ -259,6 +350,36 @@ h2.page-title{
     {% endif %}
   </div>
 </section>
+<!-- Quiz Complete Modal -->
+<div class="modal fade" id="quizDoneModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass">
+      <div class="modal-hero">
+        <div class="d-flex align-items-center">
+          <span class="icon-chip"><i class="bi bi-trophy"></i></span>
+          <div>
+            <h5 class="mb-0">Well done!</h5>
+            <p class="mb-0">You’ve answered all questions.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-body modern">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="small text-muted">Progress</div>
+          <div class="fw-bold" id="doneScore">0/0 correct</div>
+        </div>
+        <div class="q-progress mt-2">
+          <div class="track"><div class="bar" id="doneBar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="modal-footer modern">
+        <a href="{{ url_for('profile') }}" class="btn btn-plain">View Profile</a>
+        <button type="button" class="btn btn-outline-plain" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 
@@ -316,130 +437,6 @@ document.querySelectorAll('.q-card .choice').forEach(el => {
 });
 </script>
 
-<script>
-// ---- helper to render one question card from JSON ----
-function renderCard(it, idx) {
-  const choices = it.choices || [];
-  const col = document.createElement('div');
-  col.className = 'col-12';
-  col.innerHTML = `
-    <div class="q-card" data-idx="${idx}">
-      <div class="q-head">
-        <div class="d-flex align-items-start gap-2">
-          <span class="q-badge">${idx + 1}</span>
-          <h6 class="q-title">${it.q}</h6>
-        </div>
-        <div class="muted text-end small">
-          Source: <a href="${it.source}" target="_blank" rel="noopener">${it.source}</a>
-        </div>
-      </div>
-      <div class="row g-2 mt-2">
-        ${choices.map((ch, i) => `
-          <div class="col-12 col-md-6">
-            <div class="choice" data-choice="${i}">
-              <span class="bullet"></span>
-              <span>${ch}</span>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="explain mt-2 small" id="explain-${idx}"></div>
-    </div>`;
-  return col;
-}
-
-// ---- attach handlers to a card ----
-function wireCard(card) {
-  card.querySelectorAll('.choice').forEach(el => {
-    el.addEventListener('click', async () => {
-      const c = el.closest('.q-card'); if (!c || c.dataset.done === "1") return;
-      const idx = Number(c.dataset.idx);
-      const choice = Number(el.dataset.choice);
-      try {
-        const resp = await fetch("{{ url_for('quiz_answer') }}", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ idx, choice })
-        });
-        const data = await resp.json();
-        if (!data.ok) return;
-
-        // lock
-        c.dataset.done = "1";
-        c.querySelectorAll('.choice').forEach(x => x.classList.add('disabled'));
-
-        // mark
-        if (data.correct) {
-          el.classList.add('correct');
-        } else {
-          el.classList.add('wrong');
-          const all = [...c.querySelectorAll('.choice')];
-          const correctEl = all[data.answer_idx];
-          if (correctEl) correctEl.classList.add('correct');
-        }
-
-        // explanation
-        const ex = c.querySelector('#explain-'+idx);
-        if (ex) {
-          ex.style.display = 'block';
-          ex.classList.toggle('bad', !data.correct);
-          ex.innerHTML = `${data.correct ? "Correct." : "Not quite."} ${data.explain}
-            <br><a class="small" href="${data.source}" target="_blank" rel="noopener">Read source</a>`;
-        }
-
-        // points
-        const pc = document.getElementById('pointCounter');
-        if (pc) pc.textContent = data.points;
-
-        // progress
-        updateProgressUI();
-
-      } catch(_) {}
-    });
-  });
-}
-
-// ---- async generation bootstrap ----
-(async function boot() {
-  const topic = "{{ (topic or '')|e }}";
-  const hasItems = {{ 'true' if items and items|length > 0 else 'false' }};
-  if (!topic || hasItems) return;
-
-  const loader = document.getElementById('quizLoader');
-  const root = document.getElementById('itemsRoot');
-
-  try {
-    const resp = await fetch("{{ url_for('api_quiz_generate') }}", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ topic })
-    });
-    const data = await resp.json();
-    if (!data.ok) throw new Error(data.error || 'failed');
-
-    // render cards
-    root.classList.remove('d-none');
-    root.innerHTML = ''; // clear
-    data.items.forEach((it, i) => {
-      const col = renderCard(it, i);
-      root.appendChild(col);
-      wireCard(col.querySelector('.q-card'));
-    });
-
-    // points
-    const pc = document.getElementById('pointCounter');
-    if (pc) pc.textContent = data.points;
-
-    // progress
-    updateProgressUI();
-
-  } catch (e) {
-    if (loader) loader.innerHTML = "Couldn’t generate quiz right now. Please try again.";
-  } finally {
-    loader?.remove();
-  }
-})();
-</script>
 
 <script>
 // Simple HTML escape
@@ -587,6 +584,38 @@ function updateProgressUI() {
   if (label) label.textContent = `${answered}/${total} answered`;
   if (pctEl) pctEl.innerHTML = `<strong>${pct}%</strong>`;
 }
+  let quizDoneShown = false;
+
+function maybeShowDoneModal(total, answered) {
+  if (quizDoneShown || !total) return;
+  if (answered >= total) {
+    quizDoneShown = true;
+
+    // Fill modal stats
+    const points = Number(document.getElementById('pointCounter')?.textContent || 0);
+    const doneScore = document.getElementById('doneScore');
+    const doneBar   = document.getElementById('doneBar');
+    if (doneScore) doneScore.textContent = `${points}/${total} correct`;
+    const pct = Math.round((points / total) * 100);
+    if (doneBar) doneBar.style.width = pct + '%';
+
+    // Show modal (Bootstrap 5)
+    const el = document.getElementById('quizDoneModal');
+    if (el) {
+      const m = new bootstrap.Modal(el);
+      m.show();
+    }
+  }
+}
+
+// Patch your existing updateProgressUI to call maybeShowDoneModal at the end.
+const _updateProgressUI_orig = updateProgressUI;
+window.updateProgressUI = function() {
+  _updateProgressUI_orig();
+  const total = document.querySelectorAll('.q-card').length || 0;
+  const answered = document.querySelectorAll('.q-card[data-done="1"]').length || 0;
+  maybeShowDoneModal(total, answered);
+};
 </script>
 <script>
   document.addEventListener('DOMContentLoaded', () => updateProgressUI());

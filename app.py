@@ -22,7 +22,40 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
 COMMON_HEADERS = {"User-Agent": "EPICHECK/1.0 (+https://example.edu)"}
 DB_PATH = os.getenv("EPICHECK_DB", os.path.join(os.path.dirname(__file__), "epicheck.db"))
-
+STYLE_PRESETS = [
+    {
+        "key": "neo-minimal",
+        "desc": "neo-minimal, strong grid, generous white space, geometric shapes, single accent linework",
+        "typography": "bold condensed headline + humanist sans body",
+        "palette": ["cool gray", "slate", "electric blue"],
+        "texture": "subtle paper grain",
+        "layout": "tall poster with asymmetric top headline block"
+    },
+    {
+        "key": "friendly-edu",
+        "desc": "friendly educational, rounded cards, soft drop-shadows, simple icons",
+        "typography": "rounded sans headline + regular sans body",
+        "palette": ["neutral gray", "sky blue", "mint"],
+        "texture": "very light noise",
+        "layout": "modular card sections with checklist area"
+    },
+    {
+        "key": "bold-editorial",
+        "desc": "bold editorial, strong contrast, big headline, underline rules, magazine feel",
+        "typography": "serif headline + grotesk body",
+        "palette": ["off-white", "charcoal", "accent magenta"],
+        "texture": "no visible texture",
+        "layout": "clear hierarchy with large top headline and two-column body"
+    },
+    {
+        "key": "infographic-lite",
+        "desc": "clean infographic, thin strokes, small iconography, simple pictograms",
+        "typography": "technical sans headline + system sans body",
+        "palette": ["cool gray", "indigo", "teal"],
+        "texture": "none",
+        "layout": "sections with numbered badges and small charts feel"
+    },
+]
 SUBTHEMES = [
     "basic facts & definitions", "common myths", "who should avoid",
     "possible side effects", "evidence quality", "interactions/contraindications",
@@ -44,8 +77,20 @@ QUIZ_SYSTEM = (
     "explain (short rationale), source (credible URL)}. "
     "Ground questions in WHO/CDC/NIH/MedlinePlus sources."
 )
+ADMIN_EMAILS = set((os.getenv("ADMIN_EMAILS", "test@test.com") or "")
+                   .replace(";", ",").split(","))
 
-# Optional deps
+def is_admin(user) -> bool:
+    if not user:
+        return False
+    # sqlite3.Row supports dict-style indexing, not .get()
+    try:
+        email = user["email"]
+    except Exception:
+        # fallbacks for dicts or simple objects
+        email = user.get("email") if isinstance(user, dict) else getattr(user, "email", None)
+    return bool(email and (email in ADMIN_EMAILS))
+
 try:
     from openai import OpenAI
     _OPENAI_AVAILABLE = True
@@ -100,6 +145,7 @@ def jinja_dt(value, fmt="%Y-%m-%d %H:%M"):
     except Exception:
         local = dt
     return local.strftime(fmt)
+
 
 def now_utc():
     return datetime.now(timezone.utc)
@@ -351,8 +397,86 @@ def login_required(fn):
             return redirect(url_for("login", next=request.path))
         return fn(*args, **kwargs)
     return wrapper
+@app.post("/studio/posters/<int:poster_id>/delete")
+@login_required
+def poster_delete(poster_id: int):
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT p.id, p.img_path, p.campaign_id, pc.user_id
+        FROM posters p
+        JOIN poster_campaigns pc ON pc.id = p.campaign_id
+        WHERE p.id = ?
+        """,
+        (poster_id,)
+    ).fetchone()
 
+    if not row:
+        abort(404)
 
+    # Only owner or admin may delete
+    if (row["user_id"] != g.user["id"]) and (not is_admin(g.user)):
+        abort(403)
+
+    # Best-effort delete of the image file
+    try:
+        base_dir = os.path.dirname(__file__)
+        candidate = os.path.realpath(os.path.join(base_dir, row["img_path"]))
+        poster_dir_real = os.path.realpath(POSTER_DIR)
+        if candidate.startswith(poster_dir_real) and os.path.isfile(candidate):
+            os.remove(candidate)
+    except Exception:
+        pass  # don't block on filesystem issues
+
+    # Delete DB row
+    db.execute("DELETE FROM posters WHERE id = ?", (poster_id,))
+    db.commit()
+
+    # AJAX-friendly response
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True}), 200
+
+    flash("Poster deleted.", "success")
+    return redirect(url_for("studio_view", campaign_id=row["campaign_id"]))
+
+@app.post("/admin/campaigns/<int:campaign_id>/delete")
+@login_required
+def admin_delete_campaign(campaign_id: int):
+    if not is_admin(g.user):
+        abort(403)
+    db = get_db()
+    # ensure it exists (optional)
+    row = db.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,)).fetchone()
+    if not row:
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": "Not found"}), 404
+        flash("Campaign not found.", "warning")
+        return redirect(url_for("campaigns_index"))
+    # delete (items cascade)
+    db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
+    db.commit()
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True}), 200
+    flash("Campaign deleted.", "success")
+    return redirect(url_for("campaigns_index"))
+@app.post("/admin/poster-campaigns/<int:campaign_id>/delete")
+@login_required
+def admin_delete_poster_campaign(campaign_id: int):
+    if not is_admin(g.user):
+        abort(403)
+    db = get_db()
+    row = db.execute("SELECT id FROM poster_campaigns WHERE id = ?", (campaign_id,)).fetchone()
+    if not row:
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": "Not found"}), 404
+        flash("Poster campaign not found.", "warning")
+        return redirect(url_for("studio_home"))
+    db.execute("DELETE FROM poster_campaigns WHERE id = ?", (campaign_id,))
+    db.commit()
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True}), 200
+    flash("Poster campaign deleted.", "success")
+    return redirect(url_for("studio_home"))
 # ========= Monitor persistence =========
 def save_monitor_search(keywords: str, sources_used: list[str], user_id: int | None) -> int:
     db = get_db()
@@ -743,34 +867,77 @@ def ensure_ten_mcqs(display_topic: str, mix_topics: list[str], target: int = 10)
 POSTER_DIR = os.path.join(os.path.dirname(__file__), "static", "posters")
 os.makedirs(POSTER_DIR, exist_ok=True)
 
-def poster_prompt(topic: str, subtheme: str, audience: str) -> str:
+def poster_prompt(topic: str, subtheme: str, audience: str,
+                  style: dict | None = None,
+                  design_seed: str | None = None) -> str:
+    style = style or {}
+    style_desc   = style.get("desc", "modern school health poster")
+    typography   = style.get("typography", "clear headline + legible sans body")
+    palette_list = style.get("palette", ["cool gray", "slate", "electric blue"])
+    palette_line = ", ".join(palette_list)
+    texture      = style.get("texture", "subtle paper grain")
+    layout       = style.get("layout", "clean grid with strong hierarchy")
+    seed_hint    = f"\nDesign seed (for variety, not size): {design_seed}" if design_seed else ""
+
     return f"""
-Design a clean, evidence-based educational poster about "{topic}" focused on "{subtheme}" for teens ({audience}).
-Style: modern school health poster, minimal icons, big headline, legible body, subtle accent shapes.
-Avoid medical advice; avoid logos; no small text blocks. Include short checklist/flags area.
-Color palette: cool neutrals + one accent. No brand text.
+Design an evidence-based educational poster about "{topic}" focused on "{subtheme}" for teens ({audience}).
+
+Overall style: {style_desc}
+Typography: {typography}
+Layout: {layout}
+Palette: {palette_line}
+Surface/texture: {texture}
+Constraints: modern, minimal icons, big headline, legible body, short checklist/flags area,
+no logos, avoid medical advice, no small dense text blocks, school-safe.
+
+Hard requirement: final image MUST be portrait 1024x1536 (no other sizes or crops).{seed_hint}
 """
 
-def generate_poster_png(topic: str, subtheme: str, audience: str, seed: str | None = None,
-                        width=1024, height=1536) -> tuple[str, str]:
+
+def _pick_style(seed_str: str | None) -> dict:
+    """Pick a style deterministically if seed_str is given, else random."""
+    if seed_str:
+      h = sum(ord(c) for c in seed_str)
+      return STYLE_PRESETS[h % len(STYLE_PRESETS)]
+    return random.choice(STYLE_PRESETS)
+
+def generate_poster_png(topic: str, subtheme: str, audience: str,
+                        seed: str | None = None,
+                        style_key: str | None = None,
+                        n: int = 1) -> tuple[str, str]:
     """
-    Returns (absolute_file_path, file_basename). Requires OPENAI_API_KEY.
+    Generate a poster with diverse designs while always keeping size 1024x1536.
+    Uses style presets + design seed to encourage variety without changing image size.
     """
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = poster_prompt(topic, subtheme, audience)
+
+    # Select style preset (deterministic by seed or random)
+    style = next((s for s in STYLE_PRESETS if s["key"] == style_key), None)
+    if not style:
+        style = _pick_style(style_key or seed)
+
+    # Fixed size
+    w, h = 1024, 1536
+
+    # Generate prompt with style info and seed
+    prompt = poster_prompt(topic, subtheme, audience, style=style, design_seed=seed)
+
     resp = client.images.generate(
         model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1"),
         prompt=prompt.strip(),
-        size=f"{width}x{height}",
-        n=1,
+        size=f"{w}x{h}",
+        n=max(1, int(n)),  # Can request multiple, but we'll save only the first
     )
+
+    # Save the first generated image
     b64 = resp.data[0].b64_json
     raw = base64.b64decode(b64)
-    name = f"poster_{uuid.uuid4().hex}.png"
+    name = f"poster_{style['key']}_{(seed or uuid.uuid4().hex)[:8]}.png"
     out_path = os.path.join(POSTER_DIR, name)
     with open(out_path, "wb") as f:
         f.write(raw)
     return out_path, name
+
 
 
 # ========= Studio blueprint =========
@@ -802,7 +969,12 @@ def studio_home():
         "FROM poster_campaigns WHERE user_id=? ORDER BY id DESC",
         (g.user["id"],)
     ).fetchall()
-    return render_template("studio/index.html", rows=[dict(r) for r in rows])
+    return render_template(
+        "studio/index.html",
+        rows=[dict(r) for r in rows],
+        is_admin=is_admin(g.user)   # 👈 add this
+    )
+
 
 @app.route("/studio/new", methods=["GET","POST"])
 @login_required
@@ -833,7 +1005,7 @@ def studio_new():
                 )
                 db.commit()
                 cid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-                return redirect(url_for("studio.studio_view", campaign_id=cid))
+                return redirect(url_for("studio_view", campaign_id=cid))
             except Exception:
                 error = "Failed to create."
     return render_template("studio/new.html", error=error)
@@ -850,15 +1022,18 @@ def studio_view(campaign_id: int):
     ).fetchone()
     if not camp:
         flash("Not found", "warning")
-        return redirect(url_for("studio.studio_home"))
+        return redirect(url_for("studio_home"))
     posters = db.execute(
         "SELECT * FROM posters WHERE campaign_id=? ORDER BY week_no",
         (campaign_id,)
     ).fetchall()
-    return render_template("studio/view.html", campaign=dict(camp), posters=[dict(p) for p in posters])
-
+    return render_template(
+        "studio/view.html",
+        campaign=dict(camp),
+        posters=[dict(p) for p in posters],
+        style_presets=STYLE_PRESETS,  # <— add this
+    )
 @app.route("/studio/generate", methods=["POST"])
-@login_required
 def studio_generate():
     # if not g.user:
     #     abort(403)
@@ -868,8 +1043,7 @@ def studio_generate():
     week_no     = int(request.form.get("week_no") or 1)
     subtheme    = (request.form.get("subtheme") or "common myths").strip()
     seed        = (request.form.get("seed") or "").strip() or None
-    w           = int(request.form.get("w") or 1024)
-    h           = int(request.form.get("h") or 1536)
+    w, h = 1024, 1536
     print("Called B")
     camp = db.execute(
         "SELECT id, topic, audience FROM poster_campaigns WHERE id=? AND user_id=?",
@@ -879,7 +1053,7 @@ def studio_generate():
 
     abs_path, name = generate_poster_png(
         topic=camp["topic"], subtheme=subtheme, audience=camp["audience"],
-        seed=seed, width=w, height=h
+        seed=seed
     )
     print("Called D")
     rel_path = f"static/posters/{name}"
@@ -889,9 +1063,10 @@ def studio_generate():
         "VALUES (?,?,?,?,?,?,?,?)",
         (campaign_id, week_no, prompt_used, rel_path, seed, w, h, iso_now())
     )
+
     print("Called E")
     db.commit()
-    return redirect(url_for("studio.studio_view", campaign_id=campaign_id))
+    return redirect(url_for("studio_view", campaign_id=campaign_id))
 
 # Fetch a plain-text transcript for a YouTube video (best-effort, safe fallback)
 def get_youtube_transcript(video_id: str, max_chars: int = 4000) -> str | None:
@@ -1161,11 +1336,17 @@ def get_quiz_items_for_template(quiz_id: int) -> list[dict]:
     return items
 
 def get_or_create_todays_daily(display_topic: str, mix_topics: list[str]) -> int:
+    """
+    Daily quiz: return existing for today if found; otherwise create exactly once.
+    (Unchanged in behavior; kept here for completeness.)
+    """
     quiz_id = get_daily_quiz_today_id()
     if quiz_id:
         return quiz_id
+
     items = ensure_ten_mcqs(display_topic, mix_topics, target=10)
     return create_quiz(display_topic, is_daily=True, items=items)
+
 
 def record_answer_and_score(quiz_id: int, attempt_id: int, item_idx: int, selected_idx: int):
     db = get_db()
@@ -1801,12 +1982,15 @@ def campaigns_public(slug: str):
         })
     return render_template("campaigns/public.html", campaign=dict(camp), weeks=by_week)
 
-
-# ========= Quiz API =========
 @app.post("/api/quiz/generate")
 def api_quiz_generate():
+    """
+    Ad-hoc quiz generation (non-daily).
+    Fix: do NOT overwrite items at the end; only top-up if still short.
+    """
     data = request.get_json(force=True, silent=True) or {}
     topic = (data.get("topic") or "").strip()
+
     if not topic:
         display_topic, mix_topics = composite_topic_for_today(
             g.user["id"] if g.user else None, max_terms=3
@@ -1814,27 +1998,45 @@ def api_quiz_generate():
         topic = display_topic
     else:
         mix_topics = [t.strip() for t in topic.split(",") if t.strip()]
-    items = gpt_generate_mcqs(topic, n_questions=10)
+
+    items: list[dict] = []
+
+    # 1) Primary LLM path
+    primary = gpt_generate_mcqs(topic, n_questions=10)
+    items = ensure_unique_items(primary, topic="__mixed__")
+
+    # 2) Broaden the prompt if needed
     if len(items) < 10 and mix_topics:
-        broader_topic = ", ".join(mix_topics) or topic
-        more = gpt_generate_mcqs(broader_topic, n_questions=10)
+        broader = ", ".join(mix_topics) or topic
+        more = gpt_generate_mcqs(broader, n_questions=10)
         items = ensure_unique_items(items + more, topic="__mixed__")
+
+    # 3) OSS generator seeded with trusted pages
     if len(items) < 10:
-        contexts = fetch_trusted_pages(get_trusted_sources_from_session_fallback(topic))
-        more = oss_generate_mcqs(topic, contexts) or []
+        ctx = fetch_trusted_pages(get_trusted_sources_from_session_fallback(topic))
+        more = oss_generate_mcqs(topic, ctx) or []
         items = ensure_unique_items(items + more, topic="__mixed__")
+
     if len(items) < 10 and mix_topics:
-        broader_topic = ", ".join(mix_topics) or topic
-        contexts = fetch_trusted_pages(get_trusted_sources_from_session_fallback(broader_topic))
-        more = oss_generate_mcqs(broader_topic, contexts) or []
+        broader = ", ".join(mix_topics) or topic
+        ctx = fetch_trusted_pages(get_trusted_sources_from_session_fallback(broader))
+        more = oss_generate_mcqs(broader, ctx) or []
         items = ensure_unique_items(items + more, topic="__mixed__")
-    items = ensure_ten_mcqs(topic, mix_topics, target=10)
+
+    # 4) LAST-RESORT ONLY: top up to exactly 10
+    if len(items) < 10:
+        topup = ensure_ten_mcqs(topic, mix_topics, target=10)
+        items = ensure_unique_items(items + topup, topic="__mixed__")[:10]
+
     quiz_id = create_quiz(topic, is_daily=False, items=items)
     session["active_quiz_id"] = quiz_id
+
     attempt = get_or_create_attempt(quiz_id)
     points = int(attempt["score"] or 0)
     items_out = get_quiz_items_for_template(quiz_id)
+
     return {"ok": True, "quiz_id": quiz_id, "points": points, "items": items_out}
+
 
 def get_or_create_attempt(quiz_id: int):
     db = get_db()
@@ -1863,24 +2065,32 @@ def get_or_create_attempt(quiz_id: int):
         )
     db.commit()
     return db.execute("SELECT * FROM quiz_attempts WHERE id = last_insert_rowid()").fetchone()
-
 @app.post("/api/quiz/daily")
 def api_quiz_daily():
+    """
+    Daily quiz endpoint.
+    Returns the same quiz for the day, along with any saved progress.
+    """
     display_topic, mix_topics = composite_topic_for_today(
         g.user["id"] if g.user else None, max_terms=3
     )
+
     try:
         quiz_id = get_or_create_todays_daily(display_topic, mix_topics)
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
+
     session["active_quiz_id"] = quiz_id
+
     attempt = get_or_create_attempt(quiz_id)
     points = int(attempt["score"] or 0)
     items = get_quiz_items_for_template(quiz_id)
     progress = get_attempt_progress(quiz_id, attempt["id"])
+
     db = get_db()
     row = db.execute("SELECT topic FROM quizzes WHERE id = ?", (quiz_id,)).fetchone()
     final_topic = row["topic"] if row and row["topic"] else display_topic
+
     return {
         "ok": True,
         "quiz_id": quiz_id,
@@ -1889,6 +2099,177 @@ def api_quiz_daily():
         "items": items,
         "progress": progress,
     }
+# ========= Leaderboard helpers =========
+def start_of_week(dt: datetime) -> datetime:
+    # Monday as start of week (same convention you used elsewhere)
+    local = dt.astimezone(ZoneInfo(APP_TZ))
+    monday = local - timedelta(days=local.weekday())
+    return monday.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+def start_of_month(dt: datetime) -> datetime:
+    local = dt.astimezone(ZoneInfo(APP_TZ))
+    first = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return first.astimezone(timezone.utc)
+
+def start_of_year(dt: datetime) -> datetime:
+    local = dt.astimezone(ZoneInfo(APP_TZ))
+    first = local.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    return first.astimezone(timezone.utc)
+def leaderboard_tops(start_iso: str | None = None, end_iso: str | None = None) -> dict:
+    """
+    Returns leaders for:
+      - searches (monitor usage)
+      - poster campaigns created
+      - posters generated
+    in the optional [start_iso, end_iso) window.
+    """
+    db = get_db()
+
+    def window(where_col: str):
+        where, params = [], []
+        if start_iso:
+            where.append(f"{where_col} >= ?")
+            params.append(start_iso)
+        if end_iso:
+            where.append(f"{where_col} < ?")
+            params.append(end_iso)
+        return (("WHERE " + " AND ".join(where)) if where else ""), params
+
+    # Top researcher (searches)
+    w_sql, w_params = window("s.created_at")
+    top_search = db.execute(
+        f"""
+        SELECT
+          u.id AS user_id,
+          COALESCE(NULLIF(u.name,''), u.email) AS display_name,
+          COUNT(*) AS cnt,
+          MAX(s.created_at) AS last_ts
+        FROM searches s
+        JOIN users u ON u.id = s.user_id
+        {w_sql}
+        GROUP BY u.id
+        ORDER BY cnt DESC, last_ts DESC
+        LIMIT 1
+        """,
+        w_params
+    ).fetchone()
+
+    # Power campaigner (poster_campaigns created)
+    w_sql, w_params = window("pc.created_at")
+    top_campaign = db.execute(
+        f"""
+        SELECT
+          u.id AS user_id,
+          COALESCE(NULLIF(u.name,''), u.email) AS display_name,
+          COUNT(*) AS cnt,
+          MAX(pc.created_at) AS last_ts
+        FROM poster_campaigns pc
+        JOIN users u ON u.id = pc.user_id
+        {w_sql}
+        GROUP BY u.id
+        ORDER BY cnt DESC, last_ts DESC
+        LIMIT 1
+        """,
+        w_params
+    ).fetchone()
+
+    # Pro poster (posters generated) — join back to campaign to know the owner
+    w_sql, w_params = window("p.created_at")
+    top_poster = db.execute(
+        f"""
+        SELECT
+          u.id AS user_id,
+          COALESCE(NULLIF(u.name,''), u.email) AS display_name,
+          COUNT(*) AS cnt,
+          MAX(p.created_at) AS last_ts
+        FROM posters p
+        JOIN poster_campaigns pc ON pc.id = p.campaign_id
+        JOIN users u ON u.id = pc.user_id
+        {w_sql}
+        GROUP BY u.id
+        ORDER BY cnt DESC, last_ts DESC
+        LIMIT 1
+        """,
+        w_params
+    ).fetchone()
+
+    def pack(row, prefix):
+        return {
+            f"{prefix}_leader_id":   (row["user_id"] if row else None),
+            f"{prefix}_leader_name": (row["display_name"] if row else None) or "—",
+            f"{prefix}_count":       int(row["cnt"]) if row else 0,
+        }
+
+    tops = {}
+    tops.update(pack(top_search,  "search"))
+    tops.update(pack(top_campaign,"campaign"))
+    tops.update(pack(top_poster,  "poster"))
+    return tops
+
+def leaderboard_rows(start_iso: str | None = None, end_iso: str | None = None, limit: int = 50):
+    """
+    Aggregate total quiz points by user within an optional [start, end] created_at window.
+    """
+    db = get_db()
+    params = []
+    where = []
+    if start_iso:
+        where.append("qa.started_at >= ?")
+        params.append(start_iso)
+    if end_iso:
+        where.append("qa.started_at < ?")
+        params.append(end_iso)
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
+    rows = db.execute(
+        f"""
+        SELECT
+          u.id              AS user_id,
+          COALESCE(NULLIF(u.name,''), u.email) AS display_name,
+          u.email          AS email,
+          SUM(qa.score)    AS points,
+          COUNT(*)         AS quizzes,
+          MAX(qa.started_at) AS last_active
+        FROM quiz_attempts qa
+        JOIN users u ON u.id = qa.user_id
+        {where_sql}
+        GROUP BY u.id
+        ORDER BY points DESC, quizzes DESC, last_active DESC
+        LIMIT ?
+        """,
+        (*params, limit)
+    ).fetchall()
+    return [dict(r) for r in rows]
+@app.get("/leaderboard")
+@login_required
+def leaderboard():
+    now = now_utc()
+    week_start  = start_of_week(now).isoformat()
+    month_start = start_of_month(now).isoformat()
+    year_start  = start_of_year(now).isoformat()
+    end_now     = now.isoformat()
+
+    rows_week  = leaderboard_rows(start_iso=week_start,  end_iso=end_now, limit=50)
+    rows_month = leaderboard_rows(start_iso=month_start, end_iso=end_now, limit=50)
+    rows_year  = leaderboard_rows(start_iso=year_start,  end_iso=end_now, limit=50)
+    rows_all   = leaderboard_rows(limit=50)
+
+    tops_week  = leaderboard_tops(start_iso=week_start,  end_iso=end_now)
+    tops_month = leaderboard_tops(start_iso=month_start, end_iso=end_now)
+    tops_year  = leaderboard_tops(start_iso=year_start,  end_iso=end_now)
+    tops_all   = leaderboard_tops()  # all-time
+
+    return render_template(
+        "leaderboard.html",
+        rows_week=rows_week,
+        rows_month=rows_month,
+        rows_year=rows_year,
+        rows_all=rows_all,
+        tops_week=tops_week,
+        tops_month=tops_month,
+        tops_year=tops_year,
+        tops_all=tops_all,
+    )
 
 
 # ========= Main =========

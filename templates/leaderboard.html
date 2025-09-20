@@ -1,0 +1,289 @@
+{% extends "nav.html" %}
+{% block title %}Leaderboard • EPICHECK{% endblock %}
+
+{% block extra_head %}
+<!-- Bootstrap Icons (if not already included in nav.html) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<style>
+:root{
+  --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --panel:#ffffff; --glass: rgba(255,255,255,.70);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --ink:#e5e7eb; --muted:#94a3b8; --line:#1f2937; --panel:#0b0f19; --glass: rgba(23,25,35,.65); }
+}
+
+/* Hero */
+.dash-hero{ position:relative; border-radius:20px; padding:26px; background:var(--panel);
+  border:1px solid var(--line); box-shadow:0 10px 28px rgba(0,0,0,.06); overflow:hidden; }
+.dash-hero .hero-bg-particles{ position:absolute; inset:0; pointer-events:none; z-index:0; }
+.dash-hero .hero-bg-particles span{ position:absolute; display:block; border-radius:50%; opacity:.7; filter: blur(6px);
+  animation: float-particle linear infinite; }
+.dash-hero .hero-bg-particles span:nth-child(1){ width:120px;height:120px;background:rgba(96,165,250,.16); top:8%; left:12%; animation-duration:18s; }
+.dash-hero .hero-bg-particles span:nth-child(2){ width:180px;height:180px;background:rgba(167,139,250,.14); top:64%; left:72%; animation-duration:24s; animation-delay:-6s; }
+.dash-hero .hero-bg-particles span:nth-child(3){ width:90px;height:90px;background:rgba(244,114,182,.12); top:22%; left:80%; animation-duration:20s; animation-delay:-3s; }
+@keyframes float-particle{ 0%{transform:translateY(0) translateX(0) scale(1)}
+  50%{transform:translateY(-38px) translateX(22px) scale(1.06)} 100%{transform:translateY(0) translateX(0) scale(1)} }
+
+.head{ position:relative; z-index:1; }
+.eyebrow{ font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.page-title{ margin:.25rem 0 .25rem; font-weight:800; line-height:1.15; color:var(--ink); }
+.kicker{ color:var(--muted); }
+
+.glass{ background:var(--glass); backdrop-filter: blur(12px); border-radius:16px;
+  border:1px solid rgba(255,255,255,.35); box-shadow:0 10px 24px rgba(0,0,0,.08); }
+@media (prefers-color-scheme: dark){ .glass{ border-color: rgba(255,255,255,.08); } }
+
+.btn-clean{
+  border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:700;
+  border-radius:10px; padding:.55rem 1rem; transition: background .18s, border-color .18s, box-shadow .18s;
+}
+.btn-clean:hover{ background:#f8fafc; border-color:#cbd5e1; box-shadow:0 6px 14px rgba(0,0,0,.06); }
+@media (prefers-color-scheme: dark){
+  .btn-clean{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .btn-clean:hover{ background:#111827; border-color:#334155; }
+}
+
+/* Tabs */
+.lb-tabs{ display:flex; gap:.5rem; flex-wrap:wrap; }
+.lb-tab{
+  border:1px solid var(--line); background:#fff; color:#334155; font-weight:800;
+  border-radius:999px; padding:.4rem .9rem; cursor:pointer; user-select:none;
+  transition: transform .06s, background .18s, border-color .18s;
+}
+.lb-tab:hover{ background:#f8fafc; border-color:#cbd5e1; }
+.lb-tab.active{ background:#111827; color:#fff; border-color:#111827; }
+@media (prefers-color-scheme: dark){
+  .lb-tab{ background:#0f172a; color:#e5e7eb; border-color:#1f2937; }
+  .lb-tab:hover{ background:#111827; border-color:#334155; }
+  .lb-tab.active{ background:#e5e7eb; color:#111827; border-color:#e5e7eb; }
+}
+
+/* Table */
+.table thead th{ font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); border-bottom-color:var(--line); }
+.rank-badge{
+  width:28px; height:28px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;
+  font-weight:800; border:1px solid var(--line); background:#fff;
+}
+@media (prefers-color-scheme: dark){ .rank-badge{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; } }
+.top1{ box-shadow:0 0 0 2px rgba(234,179,8,.35) inset; }
+.top2{ box-shadow:0 0 0 2px rgba(148,163,184,.35) inset; }
+.top3{ box-shadow:0 0 0 2px rgba(244,114,182,.35) inset; }
+
+.small-muted{ color:var(--muted); font-size:.85rem; }
+
+/* Spotlight stats row (searches/campaigns/posters) */
+.lb-stats{
+  display:grid; gap:.75rem; margin-bottom:.75rem;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+}
+@media (max-width: 768px){
+  .lb-stats{ grid-template-columns: 1fr; }
+}
+.kpi-card{
+  background: var(--panel);
+  border:1px solid var(--line);
+  border-radius:12px; padding:14px;
+  display:flex; align-items:center; gap:.75rem;
+  box-shadow: 0 10px 20px rgba(0,0,0,.05);
+}
+.kpi-icon{
+  width:38px; height:38px; border-radius:10px;
+  display:grid; place-items:center; font-size:1.15rem;
+  background:#fff; border:1px solid var(--line);
+}
+.kpi-icon i{ font-size:1.2rem; line-height:1; }
+@media (prefers-color-scheme: dark){
+  .kpi-icon{ background:#0f172a; border-color:#1f2937; color:#e5e7eb; }
+}
+.kpi-title{ font-size:.8rem; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin:0; }
+.kpi-value{ font-weight:800; font-size:1.25rem; line-height:1.05; color:var(--ink); margin:0; }
+.kpi-sub{ color:var(--muted); font-size:.9rem; margin:0; }
+.badge-mini{ font-size:.7rem; padding:.1rem .4rem; border-radius:999px; border:1px solid var(--line); margin-left:.35rem; }
+@media (prefers-color-scheme: dark){
+  .badge-mini{ border-color:#1f2937; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="container my-3">
+  <div class="dash-hero">
+    <div class="hero-bg-particles"><span></span><span></span><span></span></div>
+    <div class="head">
+      <div class="eyebrow">Leaderboard</div>
+      <div class="d-flex flex-wrap align-items-center justify-content-between">
+        <h2 class="page-title mb-0">Top Pointers</h2>
+        <div class="lb-tabs" role="tablist" aria-label="Leaderboard ranges">
+          <button class="lb-tab active" data-target="#lb-week"  role="tab" aria-selected="true" id="tab-week">This Week</button>
+          <button class="lb-tab"         data-target="#lb-month" role="tab" aria-selected="false" id="tab-month">This Month</button>
+          <button class="lb-tab"         data-target="#lb-year"  role="tab" aria-selected="false" id="tab-year">This Year</button>
+          <button class="lb-tab"         data-target="#lb-all"   role="tab" aria-selected="false" id="tab-all">All Time</button>
+        </div>
+      </div>
+      <p class="kicker mb-0">Spotlighting researchers and creators — plus the points table below.</p>
+    </div>
+  </div>
+</section>
+
+<section class="container my-3">
+  <!-- ===== WEEK ===== -->
+  <div id="lb-week" class="glass p-3 lb-panel" role="tabpanel" aria-labelledby="tab-week">
+    {% set rows = rows_week %}
+    {% set tops = tops_week if tops_week is defined else {} %}
+    <div class="lb-stats">
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-search"></i></div>
+        <div>
+          <p class="kpi-title">Top Researcher<span class="badge-mini">Searches</span></p>
+          <p class="kpi-value">{{ tops.search_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.search_count or 0 }} searches</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-bullseye"></i></div>
+        <div>
+          <p class="kpi-title">Power Campaigner<span class="badge-mini">Campaigns</span></p>
+          <p class="kpi-value">{{ tops.campaign_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.campaign_count or 0 }} campaigns created</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-image"></i></div>
+        <div>
+          <p class="kpi-title">Pro Poster<span class="badge-mini">Posters</span></p>
+          <p class="kpi-value">{{ tops.poster_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.poster_count or 0 }} posters generated</p>
+        </div>
+      </div>
+    </div>
+
+    {% include 'leaderboard/_table.html' with context %}
+    {% include 'leaderboard/_table_body.html' %}
+  </div>
+
+  <!-- ===== MONTH ===== -->
+  <div id="lb-month" class="glass p-3 lb-panel d-none" role="tabpanel" aria-labelledby="tab-month">
+    {% set rows = rows_month %}
+    {% set tops = tops_month if tops_month is defined else {} %}
+    <div class="lb-stats">
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-search"></i></div>
+        <div>
+          <p class="kpi-title">Top Researcher<span class="badge-mini">Searches</span></p>
+          <p class="kpi-value">{{ tops.search_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.search_count or 0 }} searches</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-bullseye"></i></div>
+        <div>
+          <p class="kpi-title">Power Campaigner<span class="badge-mini">Campaigns</span></p>
+          <p class="kpi-value">{{ tops.campaign_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.campaign_count or 0 }} campaigns created</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-image"></i></div>
+        <div>
+          <p class="kpi-title">Pro Poster<span class="badge-mini">Posters</span></p>
+          <p class="kpi-value">{{ tops.poster_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.poster_count or 0 }} posters generated</p>
+        </div>
+      </div>
+    </div>
+
+    {% include 'leaderboard/_table.html' with context %}
+    {% include 'leaderboard/_table_body.html' %}
+  </div>
+
+  <!-- ===== YEAR ===== -->
+  <div id="lb-year" class="glass p-3 lb-panel d-none" role="tabpanel" aria-labelledby="tab-year">
+    {% set rows = rows_year %}
+    {% set tops = tops_year if tops_year is defined else {} %}
+    <div class="lb-stats">
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-search"></i></div>
+        <div>
+          <p class="kpi-title">Top Researcher<span class="badge-mini">Searches</span></p>
+          <p class="kpi-value">{{ tops.search_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.search_count or 0 }} searches</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-bullseye"></i></div>
+        <div>
+          <p class="kpi-title">Power Campaigner<span class="badge-mini">Campaigns</span></p>
+          <p class="kpi-value">{{ tops.campaign_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.campaign_count or 0 }} campaigns created</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-image"></i></div>
+        <div>
+          <p class="kpi-title">Pro Poster<span class="badge-mini">Posters</span></p>
+          <p class="kpi-value">{{ tops.poster_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.poster_count or 0 }} posters generated</p>
+        </div>
+      </div>
+    </div>
+
+    {% include 'leaderboard/_table.html' with context %}
+    {% include 'leaderboard/_table_body.html' %}
+  </div>
+
+  <!-- ===== ALL-TIME ===== -->
+  <div id="lb-all" class="glass p-3 lb-panel d-none" role="tabpanel" aria-labelledby="tab-all">
+    {% set rows = rows_all %}
+    {% set tops = tops_all if tops_all is defined else {} %}
+    <div class="lb-stats">
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-search"></i></div>
+        <div>
+          <p class="kpi-title">Top Researcher<span class="badge-mini">Searches</span></p>
+          <p class="kpi-value">{{ tops.search_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.search_count or 0 }} searches</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-bullseye"></i></div>
+        <div>
+          <p class="kpi-title">Power Campaigner<span class="badge-mini">Campaigns</span></p>
+          <p class="kpi-value">{{ tops.campaign_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.campaign_count or 0 }} campaigns created</p>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" aria-hidden="true"><i class="bi bi-image"></i></div>
+        <div>
+          <p class="kpi-title">Pro Poster<span class="badge-mini">Posters</span></p>
+          <p class="kpi-value">{{ tops.poster_leader_name or '—' }}</p>
+          <p class="kpi-sub">{{ tops.poster_count or 0 }} posters generated</p>
+        </div>
+      </div>
+    </div>
+
+    {% include 'leaderboard/_table.html' with context %}
+    {% include 'leaderboard/_table_body.html' %}
+  </div>
+</section>
+
+<script>
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.lb-tab');
+  if (!tab) return;
+
+  document.querySelectorAll('.lb-tab').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected','false');
+  });
+  tab.classList.add('active');
+  tab.setAttribute('aria-selected','true');
+
+  const target = tab.getAttribute('data-target');
+  document.querySelectorAll('.lb-panel').forEach(p => p.classList.add('d-none'));
+  const panel = document.querySelector(target);
+  if (panel) panel.classList.remove('d-none');
+});
+</script>
+{% endblock %}

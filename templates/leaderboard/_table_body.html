@@ -1,0 +1,23 @@
+{% if rows %}
+  {% for u in rows %}
+    {% set rank = loop.index %}
+    {% set badge = 'top1' if rank==1 else ('top2' if rank==2 else ('top3' if rank==3 else '')) %}
+    <tr>
+      <td>
+        <span class="rank-badge {{ badge }}">{{ rank }}</span>
+      </td>
+      <td class="fw-semibold">
+        {{ u.display_name or 'Anonymous' }}
+        <div class="small-muted">{{ u.email }}</div>
+      </td>
+      <td class="text-center">{{ u.quizzes or 0 }}</td>
+      <td class="text-end fw-bold">{{ u.points or 0 }}</td>
+      <td class="text-end small">{{ (u.last_active|dt) if u.last_active else '—' }}</td>
+    </tr>
+  {% endfor %}
+{% else %}
+  <tr><td colspan="5" class="text-center text-muted py-4">No data yet.</td></tr>
+{% endif %}
+    </tbody>
+  </table>
+</div>

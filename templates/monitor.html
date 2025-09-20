@@ -176,6 +176,25 @@
   }
   .spinner { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+
+.help-fab{
+  position:absolute;
+  right:12px;
+  bottom:3.5px;
+  width:40px; height:40px;
+  padding:0;
+  border-radius:999px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.help-fab i{ font-size:1rem; }
+
+.action-bar{ padding-bottom: 34px; }
+
+@media (max-width: 991.98px){
+  .help-fab{ width:40px; height:40px; bottom:-8px; }
+}
+
 </style>
 {% endblock %}
 
@@ -193,13 +212,14 @@
   <!-- Sticky action bar -->
   <section class="container my-3">
     <div class="glass action-bar p-3 p-md-4">
-      <button type="button"
-              class="btn btn-outline-plain rounded-circle position-absolute bottom-0 end-0 m-3"
-              data-bs-toggle="modal"
-              data-bs-target="#instructionModal"
-              aria-label="Instructions">
-        <i class="bi bi-question-lg"></i>
-      </button>
+    <button type="button"
+            class="btn btn-outline-plain help-fab"
+            data-bs-toggle="modal"
+            data-bs-target="#instructionModal"
+            aria-label="Instructions">
+      <i class="bi bi-question-lg"></i>
+    </button>
+
   {% set all_posts = (results.valid or []) + (results.uncertain or []) + (results.invalid or []) %}
 {% set yt_count = all_posts | selectattr('platform', 'equalto', 'YouTube') | list | length %}
 {% set rd_count = all_posts | selectattr('platform', 'equalto', 'Reddit')  | list | length %}
@@ -243,7 +263,7 @@
             </div>
 
           {% if sources_used %}
-            <div class="ms-auto tiny text-muted">
+            <div class="ms-auto tiny text-muted mb-3">
               <span class="ms-2">{{ yt_count }} YouTube • {{ rd_count }} Reddit • {{ total_count }} total</span>
             </div>
           {% endif %}

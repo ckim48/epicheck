@@ -130,16 +130,16 @@
 
     main { padding-top: 56px; }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --nav-glass-bg: color-mix(in srgb, #0b0d12 70%, transparent);
-        --nav-border: color-mix(in srgb, #e8eaed 14%, transparent);
-      }
-      .btn-monitor:hover {
-        background: color-mix(in srgb, #fff 6%, transparent);
-        border-color: color-mix(in srgb, #fff 30%, transparent);
-      }
-    }
+/*    @media (prefers-color-scheme: dark) {*/
+/*      :root {*/
+/*        --nav-glass-bg: color-mix(in srgb, #0b0d12 70%, transparent);*/
+/*        --nav-border: color-mix(in srgb, #e8eaed 14%, transparent);*/
+/*      }*/
+/*      .btn-monitor:hover {*/
+/*        background: color-mix(in srgb, #fff 6%, transparent);*/
+/*        border-color: color-mix(in srgb, #fff 30%, transparent);*/
+/*      }*/
+/*    }*/
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -170,38 +170,55 @@
       <!-- Collapsible content -->
       <div class="collapse navbar-collapse justify-content-end" id="navMain">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+<!--          <li class="nav-item">-->
+<!--            <a class="nav-link {{ 'active' if ep == 'index' else '' }}" href="{{ url_for('index') }}">-->
+<!--&lt;!&ndash;              <i class="bi bi-house-door me-1"></i>&ndash;&gt;-->
+<!--              Home-->
+<!--            </a>-->
+<!--          </li>-->
           <li class="nav-item">
-            <a class="nav-link {{ 'active' if ep == 'index' else '' }}" href="{{ url_for('index') }}">
-              <i class="bi bi-house-door me-1"></i> Home
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {{ 'active' if ep in ['quiz','quiz_daily'] else '' }}" href="{{ url_for('quiz_daily') }}">
-              <i class="bi bi-question-circle me-1"></i> Quiz
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {{ 'active' if ep == 'profile' else '' }}" href="{{ url_for('profile') }}">
-              <i class="bi bi-person-badge me-1"></i> Profile
+            <a class="nav-link {{ 'active' if ep == 'monitor' else '' }}" href="{{ url_for('monitor') }}">
+<!--              <i class="bi bi-stars me-1"></i> -->
+              Epicheck
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link {{ 'active' if ep in [
-                  'studio.studio_home',
-                  'studio.studio_new',
-                  'studio.studio_view',
-                  'studio.studio_public'
+                  'studio_home',
+                  'studio_new',
+                  'studio_view',
+                  'studio_public'
                 ] else '' }}"
-               href="{{ url_for('studio.studio_home') }}">
-              <i class="bi bi-easel2"></i> Poster Studio
+               href="{{ url_for('studio_home') }}">
+<!--              <i class="bi bi-easel2"></i> -->
+              Campaign
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ 'active' if ep in ['quiz','quiz_daily'] else '' }}" href="{{ url_for('quiz_daily') }}">
+<!--              <i class="bi bi-pencil-square"></i>-->
+              Quiz
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ 'active' if ep == 'leaderboard' else '' }}" href="{{ url_for('leaderboard') }}">
+<!--              <i class="bi bi-person-badge me-1"></i> -->
+              Leaderboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ 'active' if ep == 'profile' else '' }}" href="{{ url_for('profile') }}">
+<!--              <i class="bi bi-person-badge me-1"></i> -->
+              Profile
             </a>
           </li>
 
-          <li class="nav-item">
-            <a class="btn-monitor {{ 'is-active' if ep == 'monitor' else '' }}" href="{{ url_for('monitor') }}">
-              <i class="bi bi-activity"></i><span class="d-none d-sm-inline">Search</span>
-            </a>
-          </li>
+
+<!--          <li class="nav-item">-->
+<!--            <a class="btn-monitor {{ 'is-active' if ep == 'monitor' else '' }}" href="{{ url_for('monitor') }}">-->
+<!--              <i class="bi bi-activity"></i><span class="d-none d-sm-inline">Search</span>-->
+<!--            </a>-->
+<!--          </li>-->
 
           {% if current_user %}
             <li class="nav-item">
@@ -236,7 +253,7 @@
       if (saved === 'dark' || saved === 'light') {
         html.setAttribute('data-bs-theme', saved);
       } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        html.setAttribute('data-bs-theme', 'dark');
+
       }
       document.querySelectorAll('#themeToggle').forEach(btn=>{
         btn.addEventListener('click', ()=>{

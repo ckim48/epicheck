@@ -152,6 +152,19 @@
               <i class="bi bi-chevron-right chevron"></i>
             </div>
           </div>
+          <div class="d-none d-md-flex align-items-center gap-2">
+  {% if is_admin %}
+    <form method="post"
+          action="{{ url_for('admin_delete_campaign', campaign_id=c.id) }}"
+          onsubmit="return confirm('Delete this campaign? This cannot be undone.');">
+      <button type="submit" class="btn btn-sm btn-clean" title="Delete campaign">
+        <i class="bi bi-trash"></i>
+      </button>
+    </form>
+  {% endif %}
+  <i class="bi bi-chevron-right chevron"></i>
+</div>
+
         </div>
         {% endfor %}
 

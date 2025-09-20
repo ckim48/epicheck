@@ -1,0 +1,35 @@
+{# expects: rows (list of {display_name,email,points,quizzes,last_active}) #}
+{% set participants = rows|length %}
+{% set total_points = rows|sum(attribute='points') if rows else 0 %}
+{% set total_quizzes = rows|sum(attribute='quizzes') if rows else 0 %}
+{% set avg_points = (total_points / participants)|round(1) if participants else 0 %}
+{% set avg_quizzes = (total_quizzes / participants)|round(1) if participants else 0 %}
+{% set top = rows[0] if rows else None %}
+
+<div class="lb-stats">
+  <div class="kpi-card">
+    <div>
+      <p class="kpi-title">Total Points</p>
+      <p class="kpi-value">{{ total_points }}</p>
+      <p class="kpi-sub">{{ participants }} player{{ '' if participants==1 else 's' }}</p>
+    </div>
+  </div>
+
+  <div class="kpi-card">
+    <div>
+      <p class="kpi-title">Avg Points / Player</p>
+      <p class="kpi-value">{{ avg_points }}</p>
+      <p class="kpi-sub">{{ total_quizzes }} quizzes · avg {{ avg_quizzes }}</p>
+    </div>
+  </div>
+
+  <div class="kpi-card">
+    <div>
+      <p class="kpi-title">Top Scorer</p>
+      <p class="kpi-value">
+        {{ top.display_name if top else '—' }}
+      </p>
+      <p class="kpi-sub">{{ (top.points ~ ' pts') if top else '' }}</p>
+    </div>
+  </div>
+</div>

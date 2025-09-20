@@ -78,14 +78,40 @@ body{ background: var(--surface); color: var(--ink); }
 
 /* Poster cards */
 .card-modern{
+  position: relative;
+  display: flex; flex-direction: column;
   background: var(--card);
   border: 1px solid var(--card-border);
-  border-radius: 1rem;
+  border-radius: 14px;
   box-shadow: 0 .25rem .75rem rgba(0,0,0,.06);
   overflow: hidden;
   height: 100%;
-  display: flex; flex-direction: column;
 }
+
+/* Delete button (top-right of card) */
+.poster-delete{
+  position:absolute; top:8px; right:8px; z-index:3;
+}
+.poster-delete .btn-del{
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.35rem .55rem;
+  border-radius:.5rem;
+  border:1px solid var(--card-border);
+  background:#fff; color:#dc2626; /* red text */
+  font-weight:700; font-size:.85rem;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.poster-delete .btn-del:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 .35rem .9rem rgba(0,0,0,.08);
+  border-color:#fda4af;
+}
+@media (prefers-color-scheme: dark){
+  .poster-delete .btn-del{ background:#0b1220; border-color:#1f2937; color:#fca5a5; }
+  .poster-delete .btn-del:hover{ border-color:#f87171; }
+}
+
 .card-modern img{
   display: block; width: 100%; height: auto;
   background: #f3f4f6;
@@ -93,7 +119,7 @@ body{ background: var(--surface); color: var(--ink); }
 .card-body{
   padding: .9rem 1rem 1rem;
 }
-.meta-top{ color: var(--muted); font-size: .86rem; margin-bottom: .35rem; }
+.meta-top{ color: var(--muted); font-size: .86rem; }
 .prompt{ font-size: .9rem; color: var(--ink); }
 
 /* Download button */
@@ -130,10 +156,11 @@ body{ background: var(--surface); color: var(--ink); }
   box-shadow: 0 0 .6rem .12rem rgba(52,211,153,.45);
   display: inline-block; margin-left: .5rem;
 }
-  /* Loading overlay */
+
+/* Loading overlay */
 .loading-overlay{
   position: fixed; inset: 0; z-index: 2000;
-  background: rgba(248,250,252,.85); /* var(--surface) with opacity */
+  background: rgba(248,250,252,.85);
   display: none; align-items: center; justify-content: center;
   backdrop-filter: blur(2px);
 }
@@ -165,6 +192,52 @@ body{ background: var(--surface); color: var(--ink); }
   color: var(--muted); font-size: .92rem;
 }
 
+/* Top header for week + subtheme */
+.card-header-top {
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--card-border);
+  text-align: center;
+}
+
+.card-header-top .meta-top {
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Footer with centered button */
+.card-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--card-border);
+  background: var(--surface);
+  display: flex;
+  justify-content: center;
+}
+
+/* Poster image with soft corners on bottom only */
+.card-modern img.poster-img{
+  display: block; width: 100%; height: auto;
+  background: #f3f4f6;
+}
+
+/* Button: slightly larger, no d-block */
+.btn-download{
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .5rem 1rem;
+  border-radius: .8rem;
+  border: 1px solid var(--card-border);
+  background: #fff; color: var(--ink); font-weight: 600; text-decoration: none;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.btn-download:hover{
+  transform: translateY(-1px);
+  border-color: var(--accent-2);
+  box-shadow: 0 6px 16px rgba(0,0,0,.06);
+}
+
+/* Grid gutters */
+.row.g-3{ --bs-gutter-x: 1.1rem; --bs-gutter-y: 1.1rem; }
 </style>
 
 <div class="container my-4">
@@ -175,18 +248,20 @@ body{ background: var(--surface); color: var(--ink); }
       <h2 class="h4 mb-1">{{ campaign.title }} <span class="pulse"></span></h2>
       <small class="text-muted">{{ campaign.topic }} • {{ campaign.audience|replace('_',' ')|title }}</small>
     </div>
-<a class="btn-ghost" target="_blank"
-   href="{{ url_for('studio_public', slug=campaign.slug) }}">
-  Public page
-</a>
+    <a class="btn-ghost" target="_blank"
+       href="{{ url_for('studio_public', slug=campaign.slug) }}">
+      Public page
+    </a>
   </div>
 
   <div class="hr-soft"></div>
 
   <!-- Generate form -->
-<div class="form-wrap mb-3">
-<form id="genForm" method="post" action="{{ url_for('studio_generate') }}" class="row g-3 align-items-end">
-  <input type="hidden" name="campaign_id" value="{{ campaign.id }}">
+  <div class="form-wrap mb-3">
+    <form id="genForm" method="post" action="{{ url_for('studio_generate') }}" class="row g-3 align-items-end">
+      <input type="hidden" name="campaign_id" value="{{ campaign.id }}">
+      <input type="hidden" name="w" value="1024">
+      <input type="hidden" name="h" value="1536">
 
       <div class="col-md-1">
         <label class="form-label">Week #</label>
@@ -198,14 +273,13 @@ body{ background: var(--surface); color: var(--ink); }
         <input class="form-control" name="subtheme" placeholder="common myths, warning signs, teen guidance" required>
       </div>
 
-      <div class="col-md-2">
-        <label class="form-label">Width</label>
-        <input class="form-control" type="number" name="w" value="1024">
-      </div>
-
-      <div class="col-md-2">
-        <label class="form-label">Height</label>
-        <input class="form-control" type="number" name="h" value="1536">
+      <div class="col-md-3">
+        <label class="form-label">Style</label>
+        <select class="form-select" name="style_key">
+          {% for s in style_presets %}
+            <option value="{{ s.key }}">{{ s.key|replace('-', ' ')|title }}</option>
+          {% endfor %}
+        </select>
       </div>
 
       <div class="col-md-2">
@@ -219,10 +293,31 @@ body{ background: var(--surface); color: var(--ink); }
     {% for p in posters %}
       <div class="col-12 col-md-6 col-xl-4">
         <div class="card-modern h-100">
-          <img src="/{{ p.img_path }}" alt="poster">
-          <div class="card-body">
-            <div class="meta-top">Week {{ p.week_no }}</div>
-            <div class="prompt">{{ p.prompt }}</div>
+          <!-- Delete button (owner/admin only; server enforces) -->
+          <form class="poster-delete"
+                method="post"
+                action="{{ url_for('poster_delete', poster_id=p.id) }}"
+                onsubmit="return confirm('Delete this poster? This cannot be undone.');">
+            <button type="submit" class="btn-del" title="Delete" aria-label="Delete poster">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+
+          <!-- Top Header -->
+          <div class="card-header-top">
+            <div class="meta-top">
+              <strong>Week {{ p.week_no }}</strong>
+            </div>
+            <div class="card-subtheme mb-2">
+              {{ (p.prompt.split(' — ')[1] if ' — ' in p.prompt else p.prompt)|capitalize }}
+            </div>
+          </div>
+
+          <!-- Poster Image -->
+          <img class="poster-img" src="/{{ p.img_path }}" alt="poster">
+
+          <!-- Footer -->
+          <div class="card-footer">
             <a class="btn-download" download href="/{{ p.img_path }}">
               <i class="bi bi-download"></i> Download PNG
             </a>
@@ -240,14 +335,16 @@ body{ background: var(--surface); color: var(--ink); }
   </div>
 
 </div>
+
 <!-- Loading overlay -->
 <div id="genOverlay" class="loading-overlay" aria-hidden="true" role="status">
   <div class="loading-panel" aria-live="polite">
     <div class="spinner"></div>
     <div class="loading-title">Generating your poster…</div>
-    <div class="loading-sub">This can take up to a minute. Please don’t close this tab.</div>
+    <div class="loading-sub">This can take up to 2-3 minute. Please don’t close this tab.</div>
   </div>
 </div>
+
 <script>
 (function(){
   const form = document.getElementById('genForm');
@@ -257,12 +354,8 @@ body{ background: var(--surface); color: var(--ink); }
   if (!form || !overlay) return;
 
   form.addEventListener('submit', function(){
-    // Show overlay immediately (before navigation)
     overlay.classList.add('show');
     overlay.setAttribute('aria-hidden', 'false');
-    console.log("called");
-    // IMPORTANT: don't disable inputs here; disabled fields are not submitted.
-    // If you want to block extra clicks, only disable the button:
     if (button){
       button.disabled = true;
       button.dataset.originalText = button.textContent;

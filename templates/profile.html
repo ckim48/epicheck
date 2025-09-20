@@ -163,8 +163,8 @@
           {{ 'Guest Dashboard' if is_guest else (user.name or 'Your Dashboard') }}
         </h2>
         <div class="d-flex align-items-center gap-2">
-          <a class="btn btn-clean btn-sm" href="{{ url_for('quiz_daily') }}"><i class="bi bi-stars me-1"></i> Daily Quiz</a>
-          <a class="btn btn-clean btn-sm" href="{{ url_for('monitor') }}"><i class="bi bi-activity me-1"></i> Monitor</a>
+          <a class="btn btn-clean btn-sm" href="{{ url_for('monitor') }}"><i class="bi bi-stars me-1"></i> Epicheck</a>
+          <a class="btn btn-clean btn-sm" href="{{ url_for('studio_home') }}"><i class="bi bi-easel2"></i> Campaign</a>
         </div>
       </div>
       <p class="kicker mb-0">
